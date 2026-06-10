@@ -136,7 +136,7 @@ watch(
 
       <section class="generator__settings" aria-label="密碼設定">
         <SegmentedControl v-model="mode" label="密碼類型" :options="modeOptions" />
-        <SwitchControl v-model="encodeWithBase64" label="BASE64 加密" />
+        <SwitchControl v-model="encodeWithBase64" label="Base64 編碼" />
 
         <div v-if="mode === 'random'" class="generator__panel">
           <RangeControl v-model="randomLength" label="長度" :min="8" :max="64" suffix=" 字元" />
