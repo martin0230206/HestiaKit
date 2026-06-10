@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import RangeControl from '../components/forms/RangeControl.vue'
 import SegmentedControl from '../components/forms/SegmentedControl.vue'
 import SwitchControl from '../components/forms/SwitchControl.vue'
@@ -17,6 +17,10 @@ const mode = ref<PasswordMode>('random')
 const generatedPassword = ref('')
 const copyState = ref<'idle' | 'copied' | 'failed'>('idle')
 const encodeWithBase64 = ref(false)
+const passwordElement = ref<HTMLElement | null>(null)
+const passwordFontSize = ref('')
+let passwordResizeObserver: ResizeObserver | undefined
+let passwordFitFrame = 0
 
 const randomLength = ref(20)
 const includeUppercase = ref(true)
@@ -39,6 +43,7 @@ const modeOptions: Array<{ label: string; value: PasswordMode }> = [
 ]
 
 const strength = computed(() => estimatePasswordStrength(generatedPassword.value))
+const displayPassword = computed(() => generatedPassword.value || '請至少啟用一種字元類型')
 const selectedSymbolCharacters = computed(() => selectedSymbols.value.join(''))
 const strengthLabel = computed(() => {
   const labels = {
@@ -86,6 +91,39 @@ function generatePassword() {
   generatedPassword.value = encodeWithBase64.value && nextPassword ? encodeBase64Password(nextPassword) : nextPassword
 }
 
+async function fitPasswordToLine() {
+  const element = passwordElement.value
+
+  if (!element || !generatedPassword.value) {
+    passwordFontSize.value = ''
+    return
+  }
+
+  passwordFontSize.value = ''
+  await nextTick()
+
+  const availableWidth = element.clientWidth
+
+  if (!availableWidth) {
+    return
+  }
+
+  const computedStyle = window.getComputedStyle(element)
+  const maxFontSize = Number.parseFloat(computedStyle.fontSize)
+  const minFontSize = Number.parseFloat(computedStyle.getPropertyValue('--password-min-font-size')) || 12
+  const overflowRatio = availableWidth / element.scrollWidth
+
+  passwordFontSize.value =
+    overflowRatio < 1 ? `${Math.max(minFontSize, maxFontSize * overflowRatio * 0.98).toFixed(2)}px` : ''
+}
+
+function schedulePasswordFit() {
+  window.cancelAnimationFrame(passwordFitFrame)
+  passwordFitFrame = window.requestAnimationFrame(() => {
+    void fitPasswordToLine()
+  })
+}
+
 async function copyPassword() {
   try {
     await navigator.clipboard.writeText(generatedPassword.value)
@@ -113,6 +151,22 @@ watch(
   generatePassword,
   { immediate: true },
 )
+
+watch(displayPassword, schedulePasswordFit, { flush: 'post' })
+
+onMounted(() => {
+  schedulePasswordFit()
+
+  if (passwordElement.value) {
+    passwordResizeObserver = new ResizeObserver(schedulePasswordFit)
+    passwordResizeObserver.observe(passwordElement.value)
+  }
+})
+
+onBeforeUnmount(() => {
+  window.cancelAnimationFrame(passwordFitFrame)
+  passwordResizeObserver?.disconnect()
+})
 </script>
 
 <template>
@@ -128,10 +182,15 @@ watch(
 
     <div class="generator">
       <section class="generator__result" aria-label="產生的密碼">
-        <div>
+        <div class="generator__result-copy">
           <p class="generator__label">產生結果</p>
-          <p class="generator__password" :class="{ 'generator__password--empty': !generatedPassword }">
-            {{ generatedPassword || '請至少啟用一種字元類型' }}
+          <p
+            ref="passwordElement"
+            class="generator__password"
+            :class="{ 'generator__password--empty': !generatedPassword }"
+            :style="{ fontSize: passwordFontSize }"
+          >
+            {{ displayPassword }}
           </p>
         </div>
 
@@ -272,19 +331,30 @@ watch(
   text-transform: uppercase;
 }
 
+.generator__result-copy {
+  min-width: 0;
+}
+
 .generator__password {
+  --password-min-font-size: 0.25rem;
+
   margin: 0;
-  overflow-wrap: anywhere;
+  max-width: 100%;
+  overflow: hidden;
   color: var(--color-text-strong);
   font-family: var(--font-mono);
   font-size: clamp(1.4rem, 3vw, 2.35rem);
   line-height: 1.18;
+  text-overflow: clip;
+  white-space: nowrap;
 }
 
 .generator__password--empty {
+  overflow-wrap: anywhere;
   color: var(--color-danger);
   font-family: inherit;
   font-size: 1rem;
+  white-space: normal;
 }
 
 .generator__actions {
