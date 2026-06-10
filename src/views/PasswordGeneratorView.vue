@@ -4,6 +4,7 @@ import RangeControl from '../components/forms/RangeControl.vue'
 import SegmentedControl from '../components/forms/SegmentedControl.vue'
 import SwitchControl from '../components/forms/SwitchControl.vue'
 import {
+  defaultSymbolCharacters,
   encodeBase64Password,
   estimatePasswordStrength,
   generateMemorablePassword,
@@ -21,7 +22,8 @@ const randomLength = ref(20)
 const includeUppercase = ref(true)
 const includeLowercase = ref(true)
 const includeNumbers = ref(true)
-const includeSymbols = ref(true)
+const symbolOptions = defaultSymbolCharacters.split('')
+const selectedSymbols = ref([...symbolOptions])
 
 const wordCount = ref(4)
 const separator = ref('-')
@@ -37,6 +39,7 @@ const modeOptions: Array<{ label: string; value: PasswordMode }> = [
 ]
 
 const strength = computed(() => estimatePasswordStrength(generatedPassword.value))
+const selectedSymbolCharacters = computed(() => selectedSymbols.value.join(''))
 const strengthLabel = computed(() => {
   const labels = {
     Weak: '偏弱',
@@ -48,6 +51,14 @@ const strengthLabel = computed(() => {
   return labels[strength.value]
 })
 
+function selectAllSymbols() {
+  selectedSymbols.value = [...symbolOptions]
+}
+
+function clearSymbols() {
+  selectedSymbols.value = []
+}
+
 function generatePassword() {
   copyState.value = 'idle'
   let nextPassword = ''
@@ -58,7 +69,8 @@ function generatePassword() {
       includeUppercase: includeUppercase.value,
       includeLowercase: includeLowercase.value,
       includeNumbers: includeNumbers.value,
-      includeSymbols: includeSymbols.value,
+      includeSymbols: selectedSymbols.value.length > 0,
+      symbols: selectedSymbolCharacters.value,
     })
   } else if (mode.value === 'memorable') {
     nextPassword = generateMemorablePassword({
@@ -91,7 +103,7 @@ watch(
     includeUppercase,
     includeLowercase,
     includeNumbers,
-    includeSymbols,
+    selectedSymbolCharacters,
     wordCount,
     separator,
     memorableIncludeNumber,
@@ -145,8 +157,32 @@ watch(
             <SwitchControl v-model="includeUppercase" label="大寫字母" />
             <SwitchControl v-model="includeLowercase" label="小寫字母" />
             <SwitchControl v-model="includeNumbers" label="數字" />
-            <SwitchControl v-model="includeSymbols" label="符號" />
           </div>
+
+          <fieldset class="symbol-picker">
+            <legend>符號</legend>
+            <div class="symbol-picker__header">
+              <span>{{ selectedSymbols.length ? `已選 ${selectedSymbols.length} 個` : '未使用符號' }}</span>
+              <div class="symbol-picker__actions">
+                <button class="symbol-picker__action" type="button" @click="selectAllSymbols">
+                  全選
+                </button>
+                <button class="symbol-picker__action" type="button" @click="clearSymbols">清除</button>
+              </div>
+            </div>
+
+            <div class="symbol-picker__options">
+              <label
+                v-for="symbol in symbolOptions"
+                :key="symbol"
+                class="symbol-picker__option"
+                :class="{ 'symbol-picker__option--active': selectedSymbols.includes(symbol) }"
+              >
+                <input v-model="selectedSymbols" type="checkbox" :value="symbol" />
+                <span>{{ symbol }}</span>
+              </label>
+            </div>
+          </fieldset>
         </div>
 
         <div v-else-if="mode === 'memorable'" class="generator__panel">
@@ -297,6 +333,88 @@ watch(
   gap: var(--space-3);
 }
 
+.symbol-picker {
+  display: grid;
+  gap: var(--space-3);
+  padding: 0;
+  border: 0;
+  margin: 0;
+}
+
+.symbol-picker legend {
+  margin-bottom: var(--space-3);
+  color: var(--color-text-strong);
+  font-weight: 750;
+}
+
+.symbol-picker__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  color: var(--color-text-muted);
+  font-size: 0.92rem;
+}
+
+.symbol-picker__actions {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.symbol-picker__action {
+  min-height: 34px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-strong);
+  background: var(--color-surface);
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.symbol-picker__options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(42px, 1fr));
+  gap: var(--space-2);
+}
+
+.symbol-picker__option {
+  display: grid;
+  place-items: center;
+  min-height: 42px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-muted);
+  background: var(--color-surface);
+  font-family: var(--font-mono);
+  font-weight: 800;
+  cursor: pointer;
+  transition:
+    border-color 0.18s ease,
+    color 0.18s ease,
+    background 0.18s ease;
+}
+
+.symbol-picker__option--active {
+  border-color: var(--color-primary);
+  color: var(--color-primary-strong);
+  background: var(--color-primary-soft);
+}
+
+.symbol-picker__option input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.symbol-picker__action:focus-visible,
+.symbol-picker__option:focus-within {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
 .button {
   min-height: 42px;
   padding: 0 var(--space-4);
@@ -366,6 +484,15 @@ watch(
 
   .generator__grid {
     grid-template-columns: 1fr;
+  }
+
+  .symbol-picker__header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .symbol-picker__action {
+    flex: 1;
   }
 }
 </style>

@@ -6,6 +6,7 @@ export interface RandomPasswordOptions {
   includeLowercase: boolean
   includeNumbers: boolean
   includeSymbols: boolean
+  symbols?: string
 }
 
 export interface MemorablePasswordOptions {
@@ -24,7 +25,7 @@ export type PasswordStrength = 'Weak' | 'Good' | 'Strong' | 'Excellent'
 const uppercase = 'ABCDEFGHJKLMNPQRSTUVWXYZ'
 const lowercase = 'abcdefghijkmnopqrstuvwxyz'
 const numbers = '23456789'
-const symbols = '!@#$%^&*()-_=+[]{};:,.?'
+export const defaultSymbolCharacters = '!@#$%^&*()-_=+[]{};:,.?'
 const pinNumbers = '0123456789'
 const memorableWords = [
   'ember',
@@ -72,11 +73,12 @@ function shuffle(characters: string[]) {
 }
 
 export function generateRandomPassword(options: RandomPasswordOptions) {
+  const symbolPool = options.includeSymbols ? options.symbols ?? defaultSymbolCharacters : ''
   const pools = [
     options.includeUppercase ? uppercase : '',
     options.includeLowercase ? lowercase : '',
     options.includeNumbers ? numbers : '',
-    options.includeSymbols ? symbols : '',
+    symbolPool,
   ].filter(Boolean)
 
   if (pools.length === 0) {

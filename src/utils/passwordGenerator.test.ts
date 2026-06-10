@@ -39,6 +39,32 @@ describe('passwordGenerator', () => {
     expect(password).toBe('')
   })
 
+  it('uses only the selected symbols when a custom symbol set is provided', () => {
+    const password = generateRandomPassword({
+      length: 12,
+      includeUppercase: false,
+      includeLowercase: false,
+      includeNumbers: false,
+      includeSymbols: true,
+      symbols: '@',
+    })
+
+    expect(password).toBe('@'.repeat(12))
+  })
+
+  it('does not add a symbol pool when the selected symbol set is empty', () => {
+    const password = generateRandomPassword({
+      length: 12,
+      includeUppercase: false,
+      includeLowercase: false,
+      includeNumbers: false,
+      includeSymbols: true,
+      symbols: '',
+    })
+
+    expect(password).toBe('')
+  })
+
   it('generates numeric-only pin passwords', () => {
     const pin = generatePinPassword({ length: 8 })
 
