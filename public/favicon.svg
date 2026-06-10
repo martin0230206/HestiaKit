@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="HestiaKit">
+  <defs>
+    <linearGradient id="bg" x1="10" x2="54" y1="8" y2="58" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#2A2118"/>
+      <stop offset="1" stop-color="#12110F"/>
+    </linearGradient>
+    <linearGradient id="flame" x1="25" x2="39" y1="12" y2="47" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFD38A"/>
+      <stop offset=".58" stop-color="#F0B35A"/>
+      <stop offset="1" stop-color="#D9822B"/>
+    </linearGradient>
+    <linearGradient id="inner" x1="29" x2="36" y1="25" y2="43" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFF5D6"/>
+      <stop offset="1" stop-color="#F0B35A"/>
+    </linearGradient>
+  </defs>
+  <rect width="56" height="56" x="4" y="4" fill="url(#bg)" rx="16"/>
+  <path fill="#3A3025" d="M16 42h32v4.5A5.5 5.5 0 0 1 42.5 52h-21A5.5 5.5 0 0 1 16 46.5V42Z"/>
+  <path
+    fill="url(#flame)"
+    d="M32.6 11.5c4.6 6.3 2.2 10.9 6 15.2 2.5 2.8 5.4 5.9 5.4 11.1C44 45 38.7 50 32.1 50 25.4 50 20 45.1 20 38.1c0-5.1 2.8-9.8 6.5-14.1 2.9-3.3 4.3-7.1 6.1-12.5Z"
+  />
+  <path fill="url(#inner)" d="M32.2 29.2c2.5 3.1 5.8 5.4 5.8 10 0 4.2-2.6 7.1-6 7.1s-6-2.9-6-7.1c0-3.4 2-6.1 3.8-8.4.9-1.1 1.5-2 2.4-1.6Z"/>
+  <path fill="#231507" d="M25 22h4v20h-4V22Zm10 0h4v20h-4V22Zm-8 8h10v4H27v-4Z" opacity=".82"/>
+  <rect width="56" height="56" x="4" y="4" fill="none" stroke="#F0B35A" stroke-opacity=".26" rx="16"/>
+</svg>
