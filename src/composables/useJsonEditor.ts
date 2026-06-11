@@ -1,0 +1,224 @@
+﻿import { computed, ref, watch } from 'vue'
+import {
+  collectExpandableJsonPaths,
+  compactJsonDocument,
+  formatJsonDocument,
+  getJsonDocumentStats,
+  parseJsonDocument,
+  sortJsonDocumentKeys,
+  type JsonTransformResult,
+} from '../utils/jsonEditor'
+
+const storageKey = 'hestiakit-json-editor'
+
+export type JsonEditorViewMode = 'text' | 'tree'
+
+const sampleJson = JSON.stringify(
+  {
+    project: 'HestiaKit',
+    privacy: true,
+    tools: ['password-generator', 'json-editor'],
+    settings: {
+      theme: 'system',
+      localOnly: true,
+    },
+  },
+  null,
+  2,
+)
+
+interface StoredJsonEditorState {
+  source?: string
+  viewMode?: JsonEditorViewMode
+}
+
+function readStoredState(): StoredJsonEditorState {
+  try {
+    const storedState = window.localStorage.getItem(storageKey)
+    const parsedState = storedState ? JSON.parse(storedState) : undefined
+
+    return parsedState && typeof parsedState === 'object' ? parsedState : {}
+  } catch {
+    return {}
+  }
+}
+
+function writeStoredState(state: StoredJsonEditorState) {
+  try {
+    window.localStorage.setItem(storageKey, JSON.stringify(state))
+  } catch {
+    // Storage can be unavailable in private or restricted browser contexts.
+  }
+}
+
+function downloadText(filename: string, content: string) {
+  const blob = new Blob([content], { type: 'application/json;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+
+  link.href = url
+  link.download = filename
+  link.click()
+  URL.revokeObjectURL(url)
+}
+
+export function useJsonEditor() {
+  const storedState = readStoredState()
+  const source = ref(storedState.source ?? sampleJson)
+  const viewMode = ref<JsonEditorViewMode>(storedState.viewMode === 'tree' ? 'tree' : 'text')
+  const expandedPaths = ref<ReadonlySet<string>>(new Set(['$']))
+  const copyState = ref<'idle' | 'copied' | 'failed'>('idle')
+  const fileState = ref<'idle' | 'loaded' | 'failed'>('idle')
+  const lastAction = ref('')
+
+  const parseResult = computed(() => parseJsonDocument(source.value))
+  const treeValue = computed(() => (parseResult.value.ok ? parseResult.value.value : undefined))
+  const expandablePaths = computed(() =>
+    parseResult.value.ok ? collectExpandableJsonPaths(parseResult.value.value) : [],
+  )
+  const stats = computed(() => getJsonDocumentStats(source.value))
+  const isValid = computed(() => parseResult.value.ok)
+  const issue = computed(() => parseResult.value.issue)
+  const statusLabel = computed(() => (isValid.value ? '有效 JSON' : 'JSON 格式錯誤'))
+  const issueLocation = computed(() => {
+    if (!issue.value?.line || !issue.value.column) {
+      return ''
+    }
+
+    return `第 ${issue.value.line} 行，第 ${issue.value.column} 欄`
+  })
+
+  function applyTransform(result: JsonTransformResult, successMessage: string) {
+    copyState.value = 'idle'
+
+    if (!result.ok || result.output === undefined) {
+      lastAction.value = result.issue?.message ?? '無法處理 JSON。'
+      return
+    }
+
+    source.value = result.output
+    lastAction.value = successMessage
+  }
+
+  function formatJson() {
+    applyTransform(formatJsonDocument(source.value), '已格式化')
+  }
+
+  function compactJson() {
+    applyTransform(compactJsonDocument(source.value), '已壓縮')
+  }
+
+  function sortKeys() {
+    applyTransform(sortJsonDocumentKeys(source.value), '已排序 key')
+  }
+
+  function setViewMode(nextViewMode: JsonEditorViewMode) {
+    viewMode.value = nextViewMode
+  }
+
+  function expandTree() {
+    expandedPaths.value = new Set(expandablePaths.value)
+  }
+
+  function collapseTree() {
+    expandedPaths.value = new Set(expandablePaths.value.length ? ['$'] : [])
+  }
+
+  function toggleTreePath(path: string) {
+    const nextExpandedPaths = new Set(expandedPaths.value)
+
+    if (nextExpandedPaths.has(path)) {
+      nextExpandedPaths.delete(path)
+    } else {
+      nextExpandedPaths.add(path)
+    }
+
+    expandedPaths.value = nextExpandedPaths
+  }
+
+  function loadSample() {
+    source.value = sampleJson
+    copyState.value = 'idle'
+    fileState.value = 'idle'
+    lastAction.value = '已載入範例'
+  }
+
+  function clearJson() {
+    source.value = ''
+    copyState.value = 'idle'
+    fileState.value = 'idle'
+    lastAction.value = '已清空'
+  }
+
+  async function copyJson() {
+    try {
+      await navigator.clipboard.writeText(source.value)
+      copyState.value = 'copied'
+    } catch {
+      copyState.value = 'failed'
+    }
+  }
+
+  async function importFile(file: File) {
+    try {
+      source.value = await file.text()
+      fileState.value = 'loaded'
+      copyState.value = 'idle'
+      lastAction.value = `已開啟 ${file.name}`
+    } catch {
+      fileState.value = 'failed'
+      lastAction.value = '無法讀取檔案。'
+    }
+  }
+
+  function downloadJson() {
+    downloadText('hestiakit.json', source.value)
+    lastAction.value = '已下載'
+  }
+
+  watch(
+    [source, viewMode],
+    () => {
+      writeStoredState({
+        source: source.value,
+        viewMode: viewMode.value,
+      })
+    },
+    { immediate: true },
+  )
+
+  watch(
+    expandablePaths,
+    (paths) => {
+      expandedPaths.value = new Set(paths)
+    },
+    { immediate: true },
+  )
+
+  return {
+    clearJson,
+    collapseTree,
+    compactJson,
+    copyJson,
+    copyState,
+    downloadJson,
+    expandTree,
+    expandedPaths,
+    fileState,
+    formatJson,
+    importFile,
+    isValid,
+    issue,
+    issueLocation,
+    lastAction,
+    loadSample,
+    setViewMode,
+    sortKeys,
+    source,
+    stats,
+    statusLabel,
+    toggleTreePath,
+    treeValue,
+    viewMode,
+  }
+}

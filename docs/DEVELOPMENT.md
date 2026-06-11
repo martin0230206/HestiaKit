@@ -40,20 +40,26 @@ src/
   layouts/
     AppLayout.vue
   views/
+    JsonEditorView.vue
     PasswordGeneratorView.vue
   components/
     forms/
       RangeControl.vue
       SegmentedControl.vue
       SwitchControl.vue
+    json-editor/
+      JsonTreeNode.vue
     navigation/
       SidebarNav.vue
     theme/
       ThemeToggle.vue
   composables/
+    useJsonEditor.ts
     usePasswordGenerator.ts
     useTheme.ts
   utils/
+    jsonEditor.ts
+    jsonEditor.test.ts
     passwordGenerator.ts
     passwordGenerator.test.ts
   styles/
