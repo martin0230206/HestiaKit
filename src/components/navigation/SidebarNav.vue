@@ -98,9 +98,22 @@ const emit = defineEmits<{
   color: var(--color-text-muted);
   text-decoration: none;
   font-weight: 650;
+  transition:
+    background 0.18s ease,
+    color 0.18s ease,
+    transform 0.18s ease;
 }
 
-.sidebar__link.router-link-active {
+.sidebar__link:hover {
+  color: var(--color-text-strong);
+  background: var(--color-surface-muted);
+}
+
+.sidebar__link:active {
+  transform: translateY(1px);
+}
+
+.sidebar__link.router-link-exact-active {
   color: var(--color-text-strong);
   background: var(--color-surface);
   box-shadow: var(--shadow-control);

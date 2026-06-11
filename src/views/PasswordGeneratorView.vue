@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import RangeControl from '../components/forms/RangeControl.vue'
 import SegmentedControl from '../components/forms/SegmentedControl.vue'
@@ -10,31 +10,37 @@ const {
   copyPassword,
   copyState,
   displayPassword,
-  encodeWithBase64,
   generatePassword,
   generatedPassword,
   includeLowercase,
   includeNumbers,
+  includeSymbols,
   includeUppercase,
-  memorableCapitalize,
-  memorableIncludeNumber,
   mode,
   modeOptions,
   pinLength,
   randomLength,
   selectAllSymbols,
   selectedSymbols,
-  separator,
   strength,
   strengthLabel,
   symbolOptions,
-  wordCount,
 } = usePasswordGenerator()
 
+const symbolPickerStorageKey = 'hestiakit-password-generator-symbol-picker-open'
+const isSymbolPickerOpen = ref(readStoredSymbolPickerState())
 const passwordElement = ref<HTMLElement | null>(null)
 const passwordFontSize = ref('')
 let passwordResizeObserver: ResizeObserver | undefined
 let passwordFitFrame = 0
+
+function readStoredSymbolPickerState() {
+  try {
+    return window.localStorage.getItem(symbolPickerStorageKey) === 'true'
+  } catch {
+    return false
+  }
+}
 
 async function fitPasswordToLine() {
   const element = passwordElement.value
@@ -71,6 +77,14 @@ function schedulePasswordFit() {
 
 watch(displayPassword, schedulePasswordFit, { flush: 'post' })
 
+watch(isSymbolPickerOpen, (isOpen) => {
+  try {
+    window.localStorage.setItem(symbolPickerStorageKey, String(isOpen))
+  } catch {
+    // Storage can be unavailable in private or restricted browser contexts.
+  }
+})
+
 onMounted(() => {
   schedulePasswordFit()
 
@@ -89,7 +103,6 @@ onBeforeUnmount(() => {
 <template>
   <section class="tool-page">
     <header class="tool-page__header">
-      <p class="tool-page__eyebrow">HestiaKit Security</p>
       <div class="tool-page__heading">
         <div>
           <h1>密碼產生器</h1>
@@ -124,8 +137,6 @@ onBeforeUnmount(() => {
 
       <section class="generator__settings" aria-label="密碼設定">
         <SegmentedControl v-model="mode" label="密碼類型" :options="modeOptions" />
-        <SwitchControl v-model="encodeWithBase64" label="Base64 編碼" />
-
         <div v-if="mode === 'random'" class="generator__panel">
           <RangeControl v-model="randomLength" label="長度" :min="8" :max="64" suffix=" 字元" />
 
@@ -133,51 +144,45 @@ onBeforeUnmount(() => {
             <SwitchControl v-model="includeUppercase" label="大寫字母" />
             <SwitchControl v-model="includeLowercase" label="小寫字母" />
             <SwitchControl v-model="includeNumbers" label="數字" />
+            <SwitchControl
+              v-model="includeSymbols"
+              label="符號"
+              :description="selectedSymbols.length ? `已選 ${selectedSymbols.length} 個` : '未選擇符號'"
+            />
           </div>
 
-          <fieldset class="symbol-picker">
-            <legend>符號</legend>
-            <div class="symbol-picker__header">
-              <span>{{ selectedSymbols.length ? `已選 ${selectedSymbols.length} 個` : '未使用符號' }}</span>
+          <fieldset v-if="includeSymbols" class="symbol-picker">
+            <legend>符號選擇</legend>
+            <button
+              class="symbol-picker__toggle"
+              type="button"
+              :aria-expanded="isSymbolPickerOpen"
+              @click="isSymbolPickerOpen = !isSymbolPickerOpen"
+            >
+              <span>自訂符號</span>
+              <span>{{ selectedSymbols.length ? `已選 ${selectedSymbols.length} 個` : '未選擇符號' }}</span>
+              <span aria-hidden="true">{{ isSymbolPickerOpen ? '收合' : '展開' }}</span>
+            </button>
+
+            <div v-if="isSymbolPickerOpen" class="symbol-picker__content">
               <div class="symbol-picker__actions">
-                <button class="symbol-picker__action" type="button" @click="selectAllSymbols">
-                  全選
-                </button>
+                <button class="symbol-picker__action" type="button" @click="selectAllSymbols">全選</button>
                 <button class="symbol-picker__action" type="button" @click="clearSymbols">清除</button>
               </div>
-            </div>
 
-            <div class="symbol-picker__options">
-              <label
-                v-for="symbol in symbolOptions"
-                :key="symbol"
-                class="symbol-picker__option"
-                :class="{ 'symbol-picker__option--active': selectedSymbols.includes(symbol) }"
-              >
-                <input v-model="selectedSymbols" type="checkbox" :value="symbol" />
-                <span>{{ symbol }}</span>
-              </label>
+              <div class="symbol-picker__options">
+                <label
+                  v-for="symbol in symbolOptions"
+                  :key="symbol"
+                  class="symbol-picker__option"
+                  :class="{ 'symbol-picker__option--active': selectedSymbols.includes(symbol) }"
+                >
+                  <input v-model="selectedSymbols" type="checkbox" :value="symbol" />
+                  <span>{{ symbol }}</span>
+                </label>
+              </div>
             </div>
           </fieldset>
-        </div>
-
-        <div v-else-if="mode === 'memorable'" class="generator__panel">
-          <RangeControl v-model="wordCount" label="單字數" :min="3" :max="8" suffix=" 個" />
-
-          <label class="field">
-            <span>分隔符</span>
-            <select v-model="separator">
-              <option value="-">連字號 -</option>
-              <option value=".">句點 .</option>
-              <option value="_">底線 _</option>
-              <option value="">不使用</option>
-            </select>
-          </label>
-
-          <div class="generator__grid">
-            <SwitchControl v-model="memorableIncludeNumber" label="加入數字" />
-            <SwitchControl v-model="memorableCapitalize" label="首字大寫" />
-          </div>
         </div>
 
         <div v-else class="generator__panel">
@@ -199,15 +204,6 @@ onBeforeUnmount(() => {
 .tool-page__header {
   display: grid;
   gap: var(--space-3);
-}
-
-.tool-page__eyebrow {
-  margin: 0;
-  color: var(--color-primary-strong);
-  font-size: 0.8rem;
-  font-weight: 850;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
 }
 
 .tool-page__heading h1 {
@@ -334,17 +330,37 @@ onBeforeUnmount(() => {
   font-weight: 750;
 }
 
-.symbol-picker__header {
+.symbol-picker__toggle {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-3);
+  min-height: 44px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text-strong);
+  background: var(--color-surface);
+  font: inherit;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.symbol-picker__toggle span:nth-child(2),
+.symbol-picker__toggle span:nth-child(3) {
   color: var(--color-text-muted);
-  font-size: 0.92rem;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.symbol-picker__content {
+  display: grid;
+  gap: var(--space-3);
 }
 
 .symbol-picker__actions {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-2);
 }
 
@@ -397,6 +413,7 @@ onBeforeUnmount(() => {
 }
 
 .symbol-picker__action:focus-visible,
+.symbol-picker__toggle:focus-visible,
 .symbol-picker__option:focus-within {
   outline: 2px solid var(--color-focus);
   outline-offset: 2px;
@@ -432,27 +449,9 @@ onBeforeUnmount(() => {
   opacity: 0.5;
 }
 
-.button:focus-visible,
-.field select:focus-visible {
+.button:focus-visible {
   outline: 2px solid var(--color-focus);
   outline-offset: 2px;
-}
-
-.field {
-  display: grid;
-  gap: var(--space-2);
-  color: var(--color-text-strong);
-  font-weight: 750;
-}
-
-.field select {
-  min-height: 42px;
-  padding: 0 var(--space-3);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  color: var(--color-text);
-  background: var(--color-surface);
-  font: inherit;
 }
 
 @media (max-width: 760px) {
@@ -473,9 +472,10 @@ onBeforeUnmount(() => {
     grid-template-columns: 1fr;
   }
 
-  .symbol-picker__header {
-    align-items: stretch;
+  .symbol-picker__toggle {
+    align-items: flex-start;
     flex-direction: column;
+    padding: var(--space-3);
   }
 
   .symbol-picker__action {

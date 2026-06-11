@@ -5,6 +5,10 @@ import SegmentedControl from '../components/forms/SegmentedControl.vue'
 import { formatJson, getJsonStats, minifyJson, parseJson, sortJsonValue } from '../utils/jsonViewer'
 
 type ViewMode = 'tree' | 'text'
+interface StoredJsonViewerState {
+  rawJson?: string
+  viewMode?: ViewMode
+}
 
 const sampleJson = `{
   "project": "HestiaKit",
@@ -21,8 +25,10 @@ const sampleJson = `{
   "updatedAt": "2026-06-11T00:00:00+08:00"
 }`
 
-const rawJson = ref(sampleJson)
-const viewMode = ref<ViewMode>('tree')
+const storageKey = 'hestiakit-json-viewer'
+const storedState = readStoredState()
+const rawJson = ref(storedState.rawJson ?? sampleJson)
+const viewMode = ref<ViewMode>(storedState.viewMode === 'text' ? 'text' : 'tree')
 const copyState = ref<'idle' | 'copied' | 'failed'>('idle')
 
 const viewModeOptions: Array<{ label: string; value: ViewMode }> = [
@@ -31,6 +37,31 @@ const viewModeOptions: Array<{ label: string; value: ViewMode }> = [
 ]
 
 const parsedJson = computed(() => parseJson(rawJson.value))
+
+function readStoredState(): StoredJsonViewerState {
+  try {
+    const storedState = window.localStorage.getItem(storageKey)
+    const parsedState = storedState ? JSON.parse(storedState) : undefined
+
+    return parsedState && typeof parsedState === 'object' ? parsedState : {}
+  } catch {
+    return {}
+  }
+}
+
+function writeStoredState() {
+  try {
+    window.localStorage.setItem(
+      storageKey,
+      JSON.stringify({
+        rawJson: rawJson.value,
+        viewMode: viewMode.value,
+      }),
+    )
+  } catch {
+    // Storage can be unavailable in private or restricted browser contexts.
+  }
+}
 
 const formattedJson = computed(() => {
   if (!parsedJson.value.ok) {
@@ -101,12 +132,13 @@ async function copyFormattedJson() {
 watch(rawJson, () => {
   copyState.value = 'idle'
 })
+
+watch([rawJson, viewMode], writeStoredState, { immediate: true })
 </script>
 
 <template>
   <section class="tool-page">
     <header class="tool-page__header">
-      <p class="tool-page__eyebrow">HestiaKit Data</p>
       <div class="tool-page__heading">
         <div>
           <h1>JSON 檢視器</h1>
@@ -191,15 +223,6 @@ watch(rawJson, () => {
 .tool-page__header {
   display: grid;
   gap: var(--space-3);
-}
-
-.tool-page__eyebrow {
-  margin: 0;
-  color: var(--color-primary-strong);
-  font-size: 0.8rem;
-  font-weight: 850;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
 }
 
 .tool-page__heading h1 {

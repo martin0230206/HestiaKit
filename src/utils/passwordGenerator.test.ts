@@ -1,8 +1,6 @@
-import { describe, expect, it, vi } from 'vitest'
+﻿import { describe, expect, it, vi } from 'vitest'
 import {
-  encodeBase64Password,
   estimatePasswordStrength,
-  generateMemorablePassword,
   generatePinPassword,
   generateRandomPassword,
 } from './passwordGenerator'
@@ -69,21 +67,6 @@ describe('passwordGenerator', () => {
     const pin = generatePinPassword({ length: 8 })
 
     expect(pin).toMatch(/^\d{8}$/)
-  })
-
-  it('generates memorable passwords with the selected separator', () => {
-    const password = generateMemorablePassword({
-      wordCount: 4,
-      separator: '-',
-      includeNumber: false,
-      capitalize: false,
-    })
-
-    expect(password.split('-')).toHaveLength(4)
-  })
-
-  it('encodes generated passwords with base64', () => {
-    expect(encodeBase64Password('Password-42')).toBe('UGFzc3dvcmQtNDI=')
   })
 
   it('estimates stronger passwords as excellent', () => {

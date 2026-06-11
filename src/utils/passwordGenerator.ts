@@ -1,4 +1,4 @@
-export type PasswordMode = 'random' | 'memorable' | 'pin'
+﻿export type PasswordMode = 'random' | 'pin'
 
 export interface RandomPasswordOptions {
   length: number
@@ -7,13 +7,6 @@ export interface RandomPasswordOptions {
   includeNumbers: boolean
   includeSymbols: boolean
   symbols?: string
-}
-
-export interface MemorablePasswordOptions {
-  wordCount: number
-  separator: string
-  includeNumber: boolean
-  capitalize: boolean
 }
 
 export interface PinPasswordOptions {
@@ -27,28 +20,6 @@ const lowercase = 'abcdefghijkmnopqrstuvwxyz'
 const numbers = '23456789'
 export const defaultSymbolCharacters = '!@#$%^&*()-_=+[]{};:,.?'
 const pinNumbers = '0123456789'
-const memorableWords = [
-  'ember',
-  'harbor',
-  'cedar',
-  'lunar',
-  'anchor',
-  'silver',
-  'aurora',
-  'haven',
-  'signal',
-  'meadow',
-  'summit',
-  'velvet',
-  'orbit',
-  'cinder',
-  'river',
-  'atlas',
-  'marble',
-  'quartz',
-  'willow',
-  'breeze',
-]
 
 function randomIndex(max: number) {
   const value = new Uint32Array(1)
@@ -95,26 +66,8 @@ export function generateRandomPassword(options: RandomPasswordOptions) {
   return shuffle(requiredCharacters.slice(0, options.length))
 }
 
-export function generateMemorablePassword(options: MemorablePasswordOptions) {
-  const words = Array.from({ length: options.wordCount }, () => {
-    const word = memorableWords[randomIndex(memorableWords.length)]
-
-    return options.capitalize ? word.charAt(0).toUpperCase() + word.slice(1) : word
-  })
-
-  if (options.includeNumber) {
-    words.push(String(randomIndex(90) + 10))
-  }
-
-  return words.join(options.separator)
-}
-
 export function generatePinPassword(options: PinPasswordOptions) {
   return Array.from({ length: options.length }, () => pick(pinNumbers)).join('')
-}
-
-export function encodeBase64Password(password: string) {
-  return btoa(password)
 }
 
 export function estimatePasswordStrength(password: string): PasswordStrength {
