@@ -2,9 +2,22 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 
 export type ThemePreference = 'system' | 'light' | 'dark'
 export type AppliedTheme = 'light' | 'dark'
+export type DarkAccentPreference =
+  | 'amber'
+  | 'graphite'
+  | 'midnight'
+  | 'spruce'
+  | 'moss'
+  | 'mist'
+  | 'emerald'
+  | 'cyan'
+  | 'violet'
+  | 'rose'
 
 const storageKey = 'hestiakit-theme'
+const accentStorageKey = 'hestiakit-dark-accent'
 const preference = ref<ThemePreference>('system')
+const accentPreference = ref<DarkAccentPreference>('graphite')
 const systemTheme = ref<AppliedTheme>('light')
 
 const appliedTheme = computed<AppliedTheme>(() => {
@@ -17,6 +30,7 @@ const appliedTheme = computed<AppliedTheme>(() => {
 
 function updateDocumentTheme() {
   document.documentElement.dataset.theme = appliedTheme.value
+  document.documentElement.dataset.accent = accentPreference.value
   document.documentElement.style.colorScheme = appliedTheme.value
 }
 
@@ -25,6 +39,25 @@ function readStoredPreference() {
 
   if (storedPreference === 'system' || storedPreference === 'light' || storedPreference === 'dark') {
     preference.value = storedPreference
+  }
+}
+
+function readStoredAccentPreference() {
+  const storedAccentPreference = window.localStorage.getItem(accentStorageKey)
+
+  if (
+    storedAccentPreference === 'amber' ||
+    storedAccentPreference === 'graphite' ||
+    storedAccentPreference === 'midnight' ||
+    storedAccentPreference === 'spruce' ||
+    storedAccentPreference === 'moss' ||
+    storedAccentPreference === 'mist' ||
+    storedAccentPreference === 'emerald' ||
+    storedAccentPreference === 'cyan' ||
+    storedAccentPreference === 'violet' ||
+    storedAccentPreference === 'rose'
+  ) {
+    accentPreference.value = storedAccentPreference
   }
 }
 
@@ -42,6 +75,7 @@ export function useTheme() {
 
   onMounted(() => {
     readStoredPreference()
+    readStoredAccentPreference()
     mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
 
     updateSystemTheme(mediaQuery.matches)
@@ -59,9 +93,17 @@ export function useTheme() {
     updateDocumentTheme()
   }
 
+  function setAccent(nextAccentPreference: DarkAccentPreference) {
+    accentPreference.value = nextAccentPreference
+    window.localStorage.setItem(accentStorageKey, nextAccentPreference)
+    updateDocumentTheme()
+  }
+
   return {
+    accentPreference,
     appliedTheme,
     preference,
+    setAccent,
     setTheme,
   }
 }

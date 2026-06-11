@@ -1,15 +1,18 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import ThemeToggle from '../theme/ThemeToggle.vue'
-import type { ThemePreference } from '../../composables/useTheme'
+import type { AppliedTheme, DarkAccentPreference, ThemePreference } from '../../composables/useTheme'
 import { toolCategories, tools } from '../../tools'
 
 defineProps<{
+  accentPreference: DarkAccentPreference
+  appliedTheme: AppliedTheme
   isCollapsed: boolean
   themePreference: ThemePreference
 }>()
 
 const emit = defineEmits<{
+  'update:accentPreference': [preference: DarkAccentPreference]
   'update:isCollapsed': [isCollapsed: boolean]
   'update:themePreference': [preference: ThemePreference]
 }>()
@@ -65,7 +68,10 @@ const groupedTools = computed(() =>
 
     <ThemeToggle
       class="sidebar__theme"
+      :accent-preference="accentPreference"
+      :applied-theme="appliedTheme"
       :model-value="themePreference"
+      @update:accent-preference="emit('update:accentPreference', $event)"
       @update:model-value="emit('update:themePreference', $event)"
     />
   </aside>

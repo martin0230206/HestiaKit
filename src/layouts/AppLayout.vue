@@ -3,7 +3,7 @@ import { ref, watch } from 'vue'
 import SidebarNav from '../components/navigation/SidebarNav.vue'
 import { useTheme } from '../composables/useTheme'
 
-const { preference, setTheme } = useTheme()
+const { accentPreference, appliedTheme, preference, setAccent, setTheme } = useTheme()
 const sidebarCollapsedStorageKey = 'hestiakit-sidebar-collapsed'
 
 function readSidebarCollapsedState() {
@@ -29,8 +29,11 @@ watch(isSidebarCollapsed, (isCollapsed) => {
   <div class="app-shell" :class="{ 'app-shell--sidebar-collapsed': isSidebarCollapsed }">
     <SidebarNav
       :is-collapsed="isSidebarCollapsed"
+      :accent-preference="accentPreference"
+      :applied-theme="appliedTheme"
       :theme-preference="preference"
       @update:isCollapsed="isSidebarCollapsed = $event"
+      @update:accent-preference="setAccent"
       @update:theme-preference="setTheme"
     />
 
