@@ -1,4 +1,4 @@
-# HestiaKit 開發規格
+﻿# HestiaKit 開發規格
 
 本文件是 HestiaKit 後續開發的依據。新增功能、調整架構或整理檔案時，應優先符合這裡定義的分層與檔案結構。
 
@@ -41,14 +41,11 @@ src/
     AppLayout.vue
   views/
     PasswordGeneratorView.vue
-    JsonViewerView.vue
   components/
     forms/
       RangeControl.vue
       SegmentedControl.vue
       SwitchControl.vue
-    json/
-      JsonTreeNode.vue
     navigation/
       SidebarNav.vue
     theme/
@@ -59,8 +56,6 @@ src/
   utils/
     passwordGenerator.ts
     passwordGenerator.test.ts
-    jsonViewer.ts
-    jsonViewer.test.ts
   styles/
     theme.css
     global.css
@@ -95,11 +90,11 @@ src/
 
 ```ts
 {
-  name: 'json-viewer',
-  path: 'json-viewer',
-  label: 'JSON 檢視器',
-  icon: '{ }',
-  component: JsonViewerView,
+  name: 'password-generator',
+  path: '',
+  label: '密碼產生器',
+  icon: '＊',
+  component: PasswordGeneratorView,
 }
 ```
 

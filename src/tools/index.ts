@@ -1,5 +1,4 @@
-import type { Component } from 'vue'
-import JsonViewerView from '../views/JsonViewerView.vue'
+﻿import type { Component } from 'vue'
 import PasswordGeneratorView from '../views/PasswordGeneratorView.vue'
 
 export interface ToolDefinition {
@@ -17,12 +16,5 @@ export const tools: ToolDefinition[] = [
     label: '密碼產生器',
     icon: '＊',
     component: PasswordGeneratorView,
-  },
-  {
-    name: 'json-viewer',
-    path: 'json-viewer',
-    label: 'JSON 檢視器',
-    icon: '{ }',
-    component: JsonViewerView,
   },
 ]
