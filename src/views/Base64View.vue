@@ -13,14 +13,12 @@ const {
   deleteHistoryRecord,
   history,
   historyState,
-  inputSummary,
   isValid,
   issue,
   loadHistoryRecord,
   operation,
   output,
   outputStats,
-  outputSummary,
   saveHistoryRecord,
   source,
   sourceStats,
@@ -90,11 +88,25 @@ function getAlphabetLabel(record: Base64HistoryRecord) {
               <h2>輸出</h2>
             </div>
             <div class="base64-panel__actions">
-              <button class="button button--ghost" type="button" :disabled="!output || !isValid" @click="swapInputOutput">
-                交換
+              <button
+                class="button button--ghost base64-panel__action-button"
+                type="button"
+                aria-label="交換"
+                title="交換"
+                :disabled="!output || !isValid"
+                @click="swapInputOutput"
+              >
+                <span aria-hidden="true">⇄</span>
               </button>
-              <button class="button button--primary" type="button" :disabled="!output || !isValid" @click="copyOutput">
-                {{ copyState === 'copied' ? '已複製' : '複製' }}
+              <button
+                class="button button--primary base64-panel__action-button"
+                type="button"
+                aria-label="複製"
+                :title="copyState === 'copied' ? '已複製' : '複製'"
+                :disabled="!output || !isValid"
+                @click="copyOutput"
+              >
+                <span aria-hidden="true">{{ copyState === 'copied' ? '✓' : '⧉' }}</span>
               </button>
             </div>
           </div>
@@ -191,10 +203,6 @@ function getAlphabetLabel(record: Base64HistoryRecord) {
         </section>
       </aside>
     </section>
-
-    <p class="base64-summary" aria-live="polite">
-      {{ inputSummary }} → {{ outputSummary }}
-    </p>
   </section>
 </template>
 
@@ -276,6 +284,18 @@ function getAlphabetLabel(record: Base64HistoryRecord) {
 .base64-panel__actions {
   display: flex;
   gap: var(--space-2);
+}
+
+.button.base64-panel__action-button {
+  display: grid;
+  width: 40px;
+  min-width: 40px;
+  max-width: 40px;
+  padding: 0;
+  place-items: center;
+  font-family: var(--font-mono);
+  font-size: 1.05rem;
+  font-weight: 900;
 }
 
 .base64-textarea {
@@ -613,16 +633,6 @@ function getAlphabetLabel(record: Base64HistoryRecord) {
   outline-offset: 2px;
 }
 
-.base64-summary {
-  margin: 0;
-  overflow: hidden;
-  color: var(--color-text-muted);
-  font-family: var(--font-mono);
-  font-size: 0.85rem;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 @media (max-width: 980px) {
   .base64-workbench {
     grid-template-columns: 1fr;
@@ -657,8 +667,13 @@ function getAlphabetLabel(record: Base64HistoryRecord) {
   }
 
   .base64-panel__actions {
-    display: grid;
-    grid-template-columns: 1fr;
+    display: flex;
+    align-self: flex-start;
+    flex-direction: row;
+  }
+
+  .button.base64-panel__action-button {
+    width: 40px;
   }
 
   .base64-textarea {
