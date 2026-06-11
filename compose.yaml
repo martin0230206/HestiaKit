@@ -1,0 +1,11 @@
+name: hestiakit
+
+services:
+  web:
+    build:
+      context: .
+    image: hestiakit:local
+    container_name: hestiakit-web
+    ports:
+      - "8080:4173"
+    init: true

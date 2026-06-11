@@ -13,19 +13,21 @@ npm run build
 
 ## Docker
 
-建立本機預覽用 image：
+Docker 僅供本機預覽，線上部署仍使用 GitHub Pages。
+
+啟動：
 
 ```powershell
-docker build -t hestiakit .
-```
-
-啟動容器：
-
-```powershell
-docker run --rm -p 8080:4173 hestiakit
+docker compose up --build
 ```
 
 啟動後開啟 <http://localhost:8080>。
+
+停止：
+
+```powershell
+docker compose down
+```
 
 ## 目前工具
 
