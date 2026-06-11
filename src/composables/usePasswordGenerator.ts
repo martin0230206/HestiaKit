@@ -19,8 +19,10 @@ const modeOptions: Array<{ label: string; value: PasswordMode }> = [
   { label: 'PIN', value: 'pin' },
 ]
 
-const symbolOptions = defaultSymbolCharacters.split('')
+const defaultSymbolOptions = defaultSymbolCharacters.split('')
 const storageKey = 'hestiakit-password-generator'
+const defaultRandomLength = 32
+const defaultPinLength = 6
 
 interface StoredPasswordGeneratorState {
   mode?: PasswordMode
@@ -30,6 +32,7 @@ interface StoredPasswordGeneratorState {
   includeNumbers?: boolean
   includeSymbols?: boolean
   selectedSymbols?: string[]
+  customSymbols?: string[]
   pinLength?: number
 }
 
@@ -56,36 +59,84 @@ function writeStoredState(state: StoredPasswordGeneratorState) {
   }
 }
 
+function normalizeCustomSymbols(input: string) {
+  return Array.from(new Set(Array.from(input).filter((symbol) => /^[!-~]$/.test(symbol) && !/[A-Za-z0-9]/.test(symbol))))
+}
+
 export function usePasswordGenerator() {
   const storedState = readStoredState()
   const storedMode = storedState.mode === 'pin' ? 'pin' : 'random'
+  const storedCustomSymbols = Array.isArray(storedState.customSymbols)
+    ? storedState.customSymbols.filter((symbol) => !defaultSymbolOptions.includes(symbol))
+    : []
+  const customSymbols = ref(normalizeCustomSymbols(storedCustomSymbols.join('')))
+  const symbolOptions = computed(() => [...defaultSymbolOptions, ...customSymbols.value])
   const storedSymbols = Array.isArray(storedState.selectedSymbols)
-    ? storedState.selectedSymbols.filter((symbol) => symbolOptions.includes(symbol))
-    : [...symbolOptions]
+    ? storedState.selectedSymbols.filter((symbol) => symbolOptions.value.includes(symbol))
+    : [...symbolOptions.value]
 
   const mode = ref<PasswordMode>(storedMode)
   const generatedPassword = ref('')
   const copyState = ref<'idle' | 'copied' | 'failed'>('idle')
-  const randomLength = ref(clamp(Number(storedState.randomLength) || 32, 8, 64))
+  const randomLength = ref(clamp(Number(storedState.randomLength) || defaultRandomLength, 8, 64))
   const includeUppercase = ref(storedState.includeUppercase ?? true)
   const includeLowercase = ref(storedState.includeLowercase ?? true)
   const includeNumbers = ref(storedState.includeNumbers ?? true)
   const includeSymbols = ref(storedState.includeSymbols ?? true)
   const selectedSymbols = ref(storedSymbols)
 
-  const pinLength = ref(clamp(Number(storedState.pinLength) || 6, 4, 12))
+  const pinLength = ref(clamp(Number(storedState.pinLength) || defaultPinLength, 4, 12))
 
   const strength = computed(() => estimatePasswordStrength(generatedPassword.value))
   const displayPassword = computed(() => generatedPassword.value || '請至少啟用一種字元類型')
   const selectedSymbolCharacters = computed(() => selectedSymbols.value.join(''))
+  const customSymbolCharacters = computed(() => customSymbols.value.join(''))
   const strengthLabel = computed(() => strengthLabels[strength.value])
 
   function selectAllSymbols() {
-    selectedSymbols.value = [...symbolOptions]
+    selectedSymbols.value = [...symbolOptions.value]
   }
 
   function clearSymbols() {
     selectedSymbols.value = []
+  }
+
+  function resetSymbols() {
+    customSymbols.value = []
+    selectedSymbols.value = [...defaultSymbolOptions]
+  }
+
+  function resetSettings() {
+    mode.value = 'random'
+    copyState.value = 'idle'
+    randomLength.value = defaultRandomLength
+    includeUppercase.value = true
+    includeLowercase.value = true
+    includeNumbers.value = true
+    includeSymbols.value = true
+    resetSymbols()
+    pinLength.value = defaultPinLength
+  }
+
+  function addCustomSymbols(input: string) {
+    const nextSymbols = normalizeCustomSymbols(input)
+    const nextCustomSymbols = [...customSymbols.value]
+    const nextSelectedSymbols = new Set(selectedSymbols.value)
+    const addedSymbols: string[] = []
+
+    for (const symbol of nextSymbols) {
+      if (!symbolOptions.value.includes(symbol)) {
+        nextCustomSymbols.push(symbol)
+        addedSymbols.push(symbol)
+      }
+
+      nextSelectedSymbols.add(symbol)
+    }
+
+    customSymbols.value = nextCustomSymbols
+    selectedSymbols.value = [...nextSelectedSymbols].filter((symbol) => symbolOptions.value.includes(symbol))
+
+    return addedSymbols
   }
 
   function generatePassword() {
@@ -126,6 +177,7 @@ export function usePasswordGenerator() {
       includeNumbers,
       includeSymbols,
       selectedSymbolCharacters,
+      customSymbolCharacters,
       pinLength,
     ],
     generatePassword,
@@ -141,6 +193,7 @@ export function usePasswordGenerator() {
       includeNumbers,
       includeSymbols,
       selectedSymbolCharacters,
+      customSymbolCharacters,
       pinLength,
     ],
     () => {
@@ -152,6 +205,7 @@ export function usePasswordGenerator() {
         includeNumbers: includeNumbers.value,
         includeSymbols: includeSymbols.value,
         selectedSymbols: selectedSymbols.value,
+        customSymbols: customSymbols.value,
         pinLength: pinLength.value,
       })
     },
@@ -159,6 +213,7 @@ export function usePasswordGenerator() {
   )
 
   return {
+    addCustomSymbols,
     clearSymbols,
     copyPassword,
     copyState,
@@ -173,6 +228,7 @@ export function usePasswordGenerator() {
     modeOptions,
     pinLength,
     randomLength,
+    resetSettings,
     selectAllSymbols,
     selectedSymbols,
     strength,

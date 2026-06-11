@@ -18,7 +18,7 @@ export type PasswordStrength = 'Weak' | 'Good' | 'Strong' | 'Excellent'
 const uppercase = 'ABCDEFGHJKLMNPQRSTUVWXYZ'
 const lowercase = 'abcdefghijkmnopqrstuvwxyz'
 const numbers = '23456789'
-export const defaultSymbolCharacters = '!@#$%^&*()-_=+[]{};:,.?'
+export const defaultSymbolCharacters = '-_.~!@#$%^*+='
 const pinNumbers = '0123456789'
 
 function randomIndex(max: number) {

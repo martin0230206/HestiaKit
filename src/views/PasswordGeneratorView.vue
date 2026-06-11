@@ -6,6 +6,7 @@ import SwitchControl from '../components/forms/SwitchControl.vue'
 import { usePasswordGenerator } from '../composables/usePasswordGenerator'
 
 const {
+  addCustomSymbols,
   clearSymbols,
   copyPassword,
   copyState,
@@ -20,6 +21,7 @@ const {
   modeOptions,
   pinLength,
   randomLength,
+  resetSettings,
   selectAllSymbols,
   selectedSymbols,
   strength,
@@ -29,6 +31,8 @@ const {
 
 const symbolPickerStorageKey = 'hestiakit-password-generator-symbol-picker-open'
 const isSymbolPickerOpen = ref(readStoredSymbolPickerState())
+const customSymbolInput = ref('')
+const customSymbolFeedback = ref('')
 const passwordElement = ref<HTMLElement | null>(null)
 const passwordFontSize = ref('')
 let passwordResizeObserver: ResizeObserver | undefined
@@ -73,6 +77,35 @@ function schedulePasswordFit() {
   passwordFitFrame = window.requestAnimationFrame(() => {
     void fitPasswordToLine()
   })
+}
+
+function addCustomSymbolOptions() {
+  const input = customSymbolInput.value
+
+  if (!input.trim()) {
+    customSymbolFeedback.value = ''
+    return
+  }
+
+  const selectedCount = selectedSymbols.value.length
+  const addedSymbols = addCustomSymbols(input)
+  const selectedExistingSymbol = selectedSymbols.value.length > selectedCount
+
+  customSymbolInput.value = ''
+
+  if (addedSymbols.length) {
+    customSymbolFeedback.value = `已加入 ${addedSymbols.join(' ')}`
+    return
+  }
+
+  customSymbolFeedback.value = selectedExistingSymbol ? '已選取既有符號' : '沒有可加入的新符號'
+}
+
+function resetPasswordGeneratorSettings() {
+  resetSettings()
+  isSymbolPickerOpen.value = false
+  customSymbolInput.value = ''
+  customSymbolFeedback.value = ''
 }
 
 watch(displayPassword, schedulePasswordFit, { flush: 'post' })
@@ -136,6 +169,10 @@ onBeforeUnmount(() => {
       </section>
 
       <section class="generator__settings" aria-label="密碼設定">
+        <div class="generator__settings-actions">
+          <button class="button button--ghost" type="button" @click="resetPasswordGeneratorSettings">重置設定</button>
+        </div>
+
         <SegmentedControl v-model="mode" label="密碼類型" :options="modeOptions" />
         <div v-if="mode === 'random'" class="generator__panel">
           <RangeControl v-model="randomLength" label="長度" :min="8" :max="64" suffix=" 字元" />
@@ -169,6 +206,25 @@ onBeforeUnmount(() => {
                 <button class="symbol-picker__action" type="button" @click="selectAllSymbols">全選</button>
                 <button class="symbol-picker__action" type="button" @click="clearSymbols">清除</button>
               </div>
+
+              <form class="symbol-picker__custom" @submit.prevent="addCustomSymbolOptions">
+                <label class="symbol-picker__custom-label" for="custom-symbol-input">加入符號</label>
+                <div class="symbol-picker__custom-row">
+                  <input
+                    id="custom-symbol-input"
+                    v-model="customSymbolInput"
+                    class="symbol-picker__custom-input"
+                    type="text"
+                    inputmode="text"
+                    autocomplete="off"
+                    spellcheck="false"
+                    maxlength="32"
+                    placeholder="例如 & / \\ |"
+                  />
+                  <button class="symbol-picker__action" type="submit">加入</button>
+                </div>
+                <p v-if="customSymbolFeedback" class="symbol-picker__feedback">{{ customSymbolFeedback }}</p>
+              </form>
 
               <div class="symbol-picker__options">
                 <label
@@ -305,6 +361,11 @@ onBeforeUnmount(() => {
   padding: var(--space-6);
 }
 
+.generator__settings-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
 .generator__panel {
   display: grid;
   gap: var(--space-5);
@@ -377,6 +438,42 @@ onBeforeUnmount(() => {
   cursor: pointer;
 }
 
+.symbol-picker__custom {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.symbol-picker__custom-label {
+  color: var(--color-text-strong);
+  font-weight: 750;
+}
+
+.symbol-picker__custom-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-2);
+}
+
+.symbol-picker__custom-input {
+  min-width: 0;
+  min-height: 34px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-strong);
+  background: var(--color-surface);
+  font: inherit;
+  font-family: var(--font-mono);
+  font-weight: 750;
+}
+
+.symbol-picker__feedback {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
 .symbol-picker__options {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(42px, 1fr));
@@ -413,6 +510,7 @@ onBeforeUnmount(() => {
 }
 
 .symbol-picker__action:focus-visible,
+.symbol-picker__custom-input:focus-visible,
 .symbol-picker__toggle:focus-visible,
 .symbol-picker__option:focus-within {
   outline: 2px solid var(--color-focus);
@@ -480,6 +578,20 @@ onBeforeUnmount(() => {
 
   .symbol-picker__action {
     flex: 1;
+  }
+
+  .generator__settings-actions,
+  .symbol-picker__actions {
+    grid-template-columns: 1fr;
+  }
+
+  .generator__settings-actions {
+    display: grid;
+  }
+
+  .symbol-picker__custom-row {
+    display: grid;
+    grid-template-columns: 1fr;
   }
 }
 </style>

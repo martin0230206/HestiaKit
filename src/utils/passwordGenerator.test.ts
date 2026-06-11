@@ -1,5 +1,6 @@
 ﻿import { describe, expect, it, vi } from 'vitest'
 import {
+  defaultSymbolCharacters,
   estimatePasswordStrength,
   generatePinPassword,
   generateRandomPassword,
@@ -48,6 +49,10 @@ describe('passwordGenerator', () => {
     })
 
     expect(password).toBe('@'.repeat(12))
+  })
+
+  it('uses the compact default symbol allowlist', () => {
+    expect(defaultSymbolCharacters).toBe('-_.~!@#$%^*+=')
   })
 
   it('does not add a symbol pool when the selected symbol set is empty', () => {
