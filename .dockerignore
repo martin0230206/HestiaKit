@@ -1,0 +1,11 @@
+.git
+.github
+node_modules
+dist
+dist-ssr
+logs
+*.log
+*.local
+.codex-devserver*.log
+.vscode
+.idea

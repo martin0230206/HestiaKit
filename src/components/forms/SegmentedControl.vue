@@ -1,4 +1,4 @@
-<script setup lang="ts" generic="T extends string">
+﻿<script setup lang="ts" generic="T extends string">
 defineProps<{
   label: string
   options: Array<{ label: string; value: T }>
@@ -10,7 +10,7 @@ const model = defineModel<T>({ required: true })
 <template>
   <fieldset class="segmented-control">
     <legend>{{ label }}</legend>
-    <div class="segmented-control__options">
+    <div class="segmented-control__options" :style="{ '--segmented-control-option-count': options.length }">
       <button
         v-for="option in options"
         :key="option.value"
@@ -42,7 +42,7 @@ const model = defineModel<T>({ required: true })
 
 .segmented-control__options {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(var(--segmented-control-option-count), minmax(0, 1fr));
   gap: 4px;
   padding: 4px;
   border: 1px solid var(--color-border);

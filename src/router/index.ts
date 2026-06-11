@@ -1,6 +1,6 @@
-import { createRouter, createWebHashHistory } from 'vue-router'
+﻿import { createRouter, createWebHashHistory } from 'vue-router'
 import AppLayout from '../layouts/AppLayout.vue'
-import PasswordGeneratorView from '../views/PasswordGeneratorView.vue'
+import { tools } from '../tools'
 
 export const router = createRouter({
   history: createWebHashHistory(),
@@ -8,13 +8,11 @@ export const router = createRouter({
     {
       path: '/',
       component: AppLayout,
-      children: [
-        {
-          path: '',
-          name: 'password-generator',
-          component: PasswordGeneratorView,
-        },
-      ],
+      children: tools.map((tool) => ({
+        path: tool.path,
+        name: tool.name,
+        component: tool.component,
+      })),
     },
   ],
 })

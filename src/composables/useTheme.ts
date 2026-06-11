@@ -1,4 +1,4 @@
-import { computed, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 
 export type ThemePreference = 'system' | 'light' | 'dark'
 export type AppliedTheme = 'light' | 'dark'
@@ -28,22 +28,29 @@ function readStoredPreference() {
   }
 }
 
-function updateSystemTheme(event?: MediaQueryListEvent) {
-  systemTheme.value = event?.matches ?? window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+function updateSystemTheme(prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches) {
+  systemTheme.value = prefersDark ? 'dark' : 'light'
 }
 
 export function useTheme() {
+  let mediaQuery: MediaQueryList | undefined
+
+  function handleSystemThemeChange(event: MediaQueryListEvent) {
+    updateSystemTheme(event.matches)
+    updateDocumentTheme()
+  }
+
   onMounted(() => {
     readStoredPreference()
-    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
+    mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
 
-    updateSystemTheme()
+    updateSystemTheme(mediaQuery.matches)
     updateDocumentTheme()
+    mediaQuery.addEventListener('change', handleSystemThemeChange)
+  })
 
-    mediaQuery.addEventListener('change', (event) => {
-      updateSystemTheme(event)
-      updateDocumentTheme()
-    })
+  onBeforeUnmount(() => {
+    mediaQuery?.removeEventListener('change', handleSystemThemeChange)
   })
 
   function setTheme(nextPreference: ThemePreference) {

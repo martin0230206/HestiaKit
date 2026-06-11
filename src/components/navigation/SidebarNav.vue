@@ -1,6 +1,7 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import ThemeToggle from '../theme/ThemeToggle.vue'
 import type { ThemePreference } from '../../composables/useTheme'
+import { tools } from '../../tools'
 
 defineProps<{
   themePreference: ThemePreference
@@ -19,9 +20,14 @@ const emit = defineEmits<{
     </div>
 
     <nav class="sidebar__nav">
-      <RouterLink class="sidebar__link" to="/">
-        <span class="sidebar__link-icon" aria-hidden="true">＊</span>
-        <span>密碼產生器</span>
+      <RouterLink
+        v-for="tool in tools"
+        :key="tool.name"
+        class="sidebar__link"
+        :to="{ name: tool.name }"
+      >
+        <span class="sidebar__link-icon" aria-hidden="true">{{ tool.icon }}</span>
+        <span>{{ tool.label }}</span>
       </RouterLink>
     </nav>
 
@@ -101,6 +107,9 @@ const emit = defineEmits<{
 }
 
 .sidebar__link-icon {
+  display: inline-grid;
+  min-width: 18px;
+  place-items: center;
   color: var(--color-primary);
   font-size: 1rem;
 }
