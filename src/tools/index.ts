@@ -1,5 +1,6 @@
 import type { Component } from 'vue'
 import Base64View from '../views/Base64View.vue'
+import ClipboardMarkdownView from '../views/ClipboardMarkdownView.vue'
 import JsonEditorView from '../views/JsonEditorView.vue'
 import PasswordGeneratorView from '../views/PasswordGeneratorView.vue'
 
@@ -56,5 +57,13 @@ export const tools: ToolDefinition[] = [
     icon: '{}',
     categoryId: 'format',
     component: JsonEditorView,
+  },
+  {
+    name: 'clipboard-markdown',
+    path: 'clipboard-markdown',
+    label: '剪貼簿轉 Markdown',
+    icon: 'MD',
+    categoryId: 'format',
+    component: ClipboardMarkdownView,
   },
 ]
