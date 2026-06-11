@@ -1,7 +1,8 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
+import { computed } from 'vue'
 import ThemeToggle from '../theme/ThemeToggle.vue'
 import type { ThemePreference } from '../../composables/useTheme'
-import { tools } from '../../tools'
+import { toolCategories, tools } from '../../tools'
 
 defineProps<{
   isCollapsed: boolean
@@ -12,6 +13,15 @@ const emit = defineEmits<{
   'update:isCollapsed': [isCollapsed: boolean]
   'update:themePreference': [preference: ThemePreference]
 }>()
+
+const groupedTools = computed(() =>
+  toolCategories
+    .map((category) => ({
+      ...category,
+      tools: tools.filter((tool) => tool.categoryId === category.id),
+    }))
+    .filter((category) => category.tools.length > 0),
+)
 </script>
 
 <template>
@@ -37,17 +47,20 @@ const emit = defineEmits<{
     </div>
 
     <nav class="sidebar__nav">
-      <RouterLink
-        v-for="tool in tools"
-        :key="tool.name"
-        class="sidebar__link"
-        :aria-label="tool.label"
-        :title="isCollapsed ? tool.label : undefined"
-        :to="{ name: tool.name }"
-      >
-        <span class="sidebar__link-icon" aria-hidden="true">{{ tool.icon }}</span>
-        <span class="sidebar__link-label">{{ tool.label }}</span>
-      </RouterLink>
+      <section v-for="category in groupedTools" :key="category.id" class="sidebar__category">
+        <h2 class="sidebar__category-title">{{ category.label }}</h2>
+        <RouterLink
+          v-for="tool in category.tools"
+          :key="tool.name"
+          class="sidebar__link"
+          :aria-label="tool.label"
+          :title="isCollapsed ? tool.label : undefined"
+          :to="{ name: tool.name }"
+        >
+          <span class="sidebar__link-icon" aria-hidden="true">{{ tool.icon }}</span>
+          <span class="sidebar__link-label">{{ tool.label }}</span>
+        </RouterLink>
+      </section>
     </nav>
 
     <ThemeToggle
@@ -153,9 +166,23 @@ const emit = defineEmits<{
 .sidebar__nav {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: var(--space-5);
   min-height: 0;
   overflow-y: auto;
+}
+
+.sidebar__category {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.sidebar__category-title {
+  margin: 0;
+  color: var(--color-text-soft);
+  font-size: 0.74rem;
+  font-weight: 850;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .sidebar__link {
