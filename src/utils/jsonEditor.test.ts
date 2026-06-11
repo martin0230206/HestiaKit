@@ -4,8 +4,11 @@ import {
   compactJsonDocument,
   formatJsonDocument,
   getJsonDocumentStats,
+  parseJsonEditableValue,
   parseJsonDocument,
   sortJsonDocumentKeys,
+  updateJsonDocumentKey,
+  updateJsonDocumentValue,
 } from './jsonEditor'
 
 describe('jsonEditor', () => {
@@ -56,5 +59,43 @@ describe('jsonEditor', () => {
     })
 
     expect(paths).toEqual(['$', '$/items', '$/items/0', '$/meta'])
+  })
+
+  it('infers editable value types from JSON literal input', () => {
+    expect(parseJsonEditableValue('123')).toBe(123)
+    expect(parseJsonEditableValue('true')).toBe(true)
+    expect(parseJsonEditableValue('null')).toBeNull()
+    expect(parseJsonEditableValue('{"enabled":true}')).toEqual({ enabled: true })
+    expect(parseJsonEditableValue('[1,2]')).toEqual([1, 2])
+    expect(parseJsonEditableValue('HestiaKit')).toBe('HestiaKit')
+    expect(parseJsonEditableValue('')).toBe('')
+  })
+
+  it('updates a nested object key without changing its value', () => {
+    const result = updateJsonDocumentKey('{"settings":{"theme":"system","localOnly":true}}', '$/settings/localOnly', 'private')
+
+    expect(result.ok).toBe(true)
+    expect(result.output).toBe('{\n  "settings": {\n    "theme": "system",\n    "private": true\n  }\n}')
+  })
+
+  it('does not overwrite an existing object key when renaming', () => {
+    const result = updateJsonDocumentKey('{"theme":"system","private":true}', '$/theme', 'private')
+
+    expect(result.ok).toBe(false)
+    expect(result.issue?.message).toContain('已存在')
+  })
+
+  it('updates nested primitive values by tree path', () => {
+    const result = updateJsonDocumentValue('{"items":[{"enabled":false,"count":1}]}', '$/items/0/count', 3)
+
+    expect(result.ok).toBe(true)
+    expect(result.output).toBe('{\n  "items": [\n    {\n      "enabled": false,\n      "count": 3\n    }\n  ]\n}')
+  })
+
+  it('updates escaped object keys by tree path', () => {
+    const result = updateJsonDocumentValue('{"a/b":{"c~d":"old"}}', '$/a~1b/c~0d', 'new')
+
+    expect(result.ok).toBe(true)
+    expect(result.output).toBe('{\n  "a/b": {\n    "c~d": "new"\n  }\n}')
   })
 })

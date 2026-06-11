@@ -6,6 +6,9 @@ import {
   getJsonDocumentStats,
   parseJsonDocument,
   sortJsonDocumentKeys,
+  toJsonTreeChildPath,
+  updateJsonDocumentKey,
+  updateJsonDocumentValue,
   type JsonTransformResult,
 } from '../utils/jsonEditor'
 
@@ -62,6 +65,28 @@ function downloadText(filename: string, content: string) {
   URL.revokeObjectURL(url)
 }
 
+function getJsonTreeParentPath(path: string) {
+  const separatorIndex = path.lastIndexOf('/')
+
+  return separatorIndex > 0 ? path.slice(0, separatorIndex) : '$'
+}
+
+function remapExpandedPaths(paths: ReadonlySet<string>, currentPath: string, nextPath: string) {
+  return new Set(
+    [...paths].map((expandedPath) => {
+      if (expandedPath === currentPath) {
+        return nextPath
+      }
+
+      if (expandedPath.startsWith(`${currentPath}/`)) {
+        return `${nextPath}${expandedPath.slice(currentPath.length)}`
+      }
+
+      return expandedPath
+    }),
+  )
+}
+
 export function useJsonEditor() {
   const storedState = readStoredState()
   const source = ref(storedState.source ?? sampleJson)
@@ -110,6 +135,30 @@ export function useJsonEditor() {
 
   function sortKeys() {
     applyTransform(sortJsonDocumentKeys(source.value), '已排序 key')
+  }
+
+  function updateTreeKey(path: string, nextKey: string) {
+    const result = updateJsonDocumentKey(source.value, path, nextKey)
+
+    applyTransform(result, '已更新 key')
+
+    if (result.ok) {
+      expandedPaths.value = remapExpandedPaths(
+        expandedPaths.value,
+        path,
+        toJsonTreeChildPath(getJsonTreeParentPath(path), nextKey),
+      )
+    }
+
+    return result.ok
+  }
+
+  function updateTreeValue(path: string, nextValue: unknown) {
+    const result = updateJsonDocumentValue(source.value, path, nextValue)
+
+    applyTransform(result, '已更新 value')
+
+    return result.ok
   }
 
   function setViewMode(nextViewMode: JsonEditorViewMode) {
@@ -189,8 +238,20 @@ export function useJsonEditor() {
 
   watch(
     expandablePaths,
-    (paths) => {
-      expandedPaths.value = new Set(paths)
+    (paths, previousPaths) => {
+      if (!previousPaths) {
+        expandedPaths.value = new Set(paths)
+        return
+      }
+
+      const validPaths = new Set(paths)
+      const nextExpandedPaths = new Set([...expandedPaths.value].filter((path) => validPaths.has(path)))
+
+      if (validPaths.has('$')) {
+        nextExpandedPaths.add('$')
+      }
+
+      expandedPaths.value = nextExpandedPaths
     },
     { immediate: true },
   )
@@ -219,6 +280,8 @@ export function useJsonEditor() {
     statusLabel,
     toggleTreePath,
     treeValue,
+    updateTreeKey,
+    updateTreeValue,
     viewMode,
   }
 }

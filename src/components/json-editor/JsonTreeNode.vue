@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import {
   getJsonValueKind,
+  parseJsonEditableValue,
   toJsonTreeChildPath,
   type JsonValueKind,
 } from '../../utils/jsonEditor'
@@ -15,6 +16,8 @@ const props = defineProps<{
   path: string
   expandedPaths: ReadonlySet<string>
   togglePath: (path: string) => void
+  updateKey: (path: string, nextKey: string) => boolean
+  updateValue: (path: string, nextValue: unknown) => boolean
   nodeKey?: string | number
   depth?: number
 }>()
@@ -42,6 +45,9 @@ const childEntries = computed(() => {
 })
 const isExpandable = computed(() => childEntries.value.length > 0)
 const keyLabel = computed(() => (props.nodeKey === undefined ? 'root' : String(props.nodeKey)))
+const canEditKey = computed(() => typeof props.nodeKey === 'string')
+const canEditValue = computed(() => !Array.isArray(props.value) && (props.value === null || typeof props.value !== 'object'))
+const editableValueText = computed(() => String(props.value))
 const summary = computed(() => getSummary(props.value, kind.value, childEntries.value.length))
 
 function getSummary(value: unknown, valueKind: JsonValueKind, childCount: number) {
@@ -58,6 +64,32 @@ function getSummary(value: unknown, valueKind: JsonValueKind, childCount: number
   }
 
   return String(value)
+}
+
+function commitKey(event: Event) {
+  if (!canEditKey.value) {
+    return
+  }
+
+  const input = event.target as HTMLInputElement
+  const nextKey = input.value
+
+  if (nextKey === props.nodeKey) {
+    return
+  }
+
+  if (!props.updateKey(props.path, nextKey)) {
+    input.value = keyLabel.value
+  }
+}
+
+function commitValue(event: Event) {
+  const input = event.target as HTMLInputElement
+  const nextValue = parseJsonEditableValue(input.value)
+
+  if (!Object.is(nextValue, props.value)) {
+    props.updateValue(props.path, nextValue)
+  }
 }
 </script>
 
@@ -76,9 +108,31 @@ function getSummary(value: unknown, valueKind: JsonValueKind, childCount: number
       </button>
       <span v-else class="json-tree-node__spacer" aria-hidden="true"></span>
 
-      <span class="json-tree-node__key">{{ keyLabel }}</span>
+      <input
+        v-if="canEditKey"
+        class="json-tree-node__key-input"
+        type="text"
+        :value="keyLabel"
+        aria-label="編輯 key"
+        spellcheck="false"
+        autocomplete="off"
+        @change="commitKey"
+        @keydown.enter.prevent="commitKey"
+      />
+      <span v-else class="json-tree-node__key">{{ keyLabel }}</span>
       <span class="json-tree-node__type">{{ kind }}</span>
-      <span class="json-tree-node__summary">{{ summary }}</span>
+      <input
+        v-if="canEditValue"
+        class="json-tree-node__value-input"
+        type="text"
+        :value="editableValueText"
+        aria-label="編輯 value"
+        spellcheck="false"
+        autocomplete="off"
+        @change="commitValue"
+        @keydown.enter.prevent="commitValue"
+      />
+      <span v-else class="json-tree-node__summary">{{ summary }}</span>
     </div>
 
     <div v-if="isExpandable && isExpanded" class="json-tree-node__children">
@@ -90,6 +144,8 @@ function getSummary(value: unknown, valueKind: JsonValueKind, childCount: number
         :node-key="entry.key"
         :expanded-paths="expandedPaths"
         :toggle-path="togglePath"
+        :update-key="updateKey"
+        :update-value="updateValue"
         :depth="(depth ?? 0) + 1"
       />
     </div>
@@ -143,7 +199,8 @@ function getSummary(value: unknown, valueKind: JsonValueKind, childCount: number
   height: 24px;
 }
 
-.json-tree-node__key {
+.json-tree-node__key,
+.json-tree-node__key-input {
   min-width: 0;
   overflow: hidden;
   color: var(--color-text-strong);
@@ -159,12 +216,48 @@ function getSummary(value: unknown, valueKind: JsonValueKind, childCount: number
   text-transform: uppercase;
 }
 
-.json-tree-node__summary {
+.json-tree-node__summary,
+.json-tree-node__value-input {
   min-width: 0;
   overflow: hidden;
   color: var(--color-text-muted);
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.json-tree-node__key-input,
+.json-tree-node__value-input {
+  width: 100%;
+  height: 26px;
+  padding: 0 var(--space-2);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  font: inherit;
+}
+
+.json-tree-node__key-input {
+  color: var(--color-text-strong);
+  font-weight: 800;
+}
+
+.json-tree-node__value-input {
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
+}
+
+.json-tree-node__key-input:hover,
+.json-tree-node__value-input:hover {
+  border-color: var(--color-border);
+  background: var(--color-surface);
+}
+
+.json-tree-node__key-input:focus,
+.json-tree-node__value-input:focus {
+  border-color: var(--color-focus);
+  background: var(--color-surface);
+  outline: none;
+  box-shadow: 0 0 0 1px var(--color-focus);
 }
 
 @media (max-width: 720px) {

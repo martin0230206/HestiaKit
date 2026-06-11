@@ -27,6 +27,8 @@ const {
   statusLabel,
   toggleTreePath,
   treeValue,
+  updateTreeKey,
+  updateTreeValue,
   viewMode,
 } = useJsonEditor()
 
@@ -155,6 +157,8 @@ function handleFileChange(event: Event) {
               path="$"
               :expanded-paths="expandedPaths"
               :toggle-path="toggleTreePath"
+              :update-key="updateTreeKey"
+              :update-value="updateTreeValue"
             />
 
             <div v-else class="json-tree__empty">

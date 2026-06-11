@@ -17,6 +17,10 @@ export interface JsonTransformResult {
   issue?: JsonParseIssue
 }
 
+export interface JsonTreeEditResult extends JsonTransformResult {
+  value?: unknown
+}
+
 export interface JsonDocumentStats {
   characters: number
   lines: number
@@ -76,6 +80,166 @@ function sortValue(value: unknown): unknown {
   return value
 }
 
+function decodeJsonTreePath(path: string): string[] | undefined {
+  if (path === '$') {
+    return []
+  }
+
+  if (!path.startsWith('$/')) {
+    return undefined
+  }
+
+  return path
+    .slice(2)
+    .split('/')
+    .map((segment) => segment.replace(/~1/g, '/').replace(/~0/g, '~'))
+}
+
+function getPathIssue(path: string): JsonParseIssue {
+  return {
+    message: `無法定位 JSON 節點：${path}`,
+  }
+}
+
+function getDuplicateKeyIssue(key: string): JsonParseIssue {
+  return {
+    message: `key "${key}" 已存在。`,
+  }
+}
+
+function updateValueAtPath(value: unknown, pathSegments: string[], nextValue: unknown): JsonTreeEditResult {
+  if (pathSegments.length === 0) {
+    return {
+      ok: true,
+      value: nextValue,
+    }
+  }
+
+  const [currentSegment, ...childSegments] = pathSegments
+
+  if (Array.isArray(value)) {
+    const index = Number(currentSegment)
+
+    if (!Number.isInteger(index) || index < 0 || index >= value.length) {
+      return { ok: false, issue: getPathIssue(`$/${pathSegments.join('/')}`) }
+    }
+
+    const childResult = updateValueAtPath(value[index], childSegments, nextValue)
+
+    if (!childResult.ok) {
+      return childResult
+    }
+
+    const nextArray = [...value]
+    nextArray[index] = childResult.value
+
+    return {
+      ok: true,
+      value: nextArray,
+    }
+  }
+
+  if (value !== null && typeof value === 'object') {
+    const objectValue = value as Record<string, unknown>
+
+    if (!Object.hasOwn(objectValue, currentSegment)) {
+      return { ok: false, issue: getPathIssue(`$/${pathSegments.join('/')}`) }
+    }
+
+    const childResult = updateValueAtPath(objectValue[currentSegment], childSegments, nextValue)
+
+    if (!childResult.ok) {
+      return childResult
+    }
+
+    return {
+      ok: true,
+      value: {
+        ...objectValue,
+        [currentSegment]: childResult.value,
+      },
+    }
+  }
+
+  return { ok: false, issue: getPathIssue(`$/${pathSegments.join('/')}`) }
+}
+
+function renameKeyAtPath(value: unknown, pathSegments: string[], nextKey: string): JsonTreeEditResult {
+  if (pathSegments.length === 0) {
+    return {
+      ok: false,
+      issue: {
+        message: 'root 節點沒有可編輯的 key。',
+      },
+    }
+  }
+
+  const [currentSegment, ...childSegments] = pathSegments
+
+  if (Array.isArray(value)) {
+    const index = Number(currentSegment)
+
+    if (!Number.isInteger(index) || index < 0 || index >= value.length) {
+      return { ok: false, issue: getPathIssue(`$/${pathSegments.join('/')}`) }
+    }
+
+    const childResult = renameKeyAtPath(value[index], childSegments, nextKey)
+
+    if (!childResult.ok) {
+      return childResult
+    }
+
+    const nextArray = [...value]
+    nextArray[index] = childResult.value
+
+    return {
+      ok: true,
+      value: nextArray,
+    }
+  }
+
+  if (value !== null && typeof value === 'object') {
+    const objectValue = value as Record<string, unknown>
+
+    if (!Object.hasOwn(objectValue, currentSegment)) {
+      return { ok: false, issue: getPathIssue(`$/${pathSegments.join('/')}`) }
+    }
+
+    if (childSegments.length > 0) {
+      const childResult = renameKeyAtPath(objectValue[currentSegment], childSegments, nextKey)
+
+      if (!childResult.ok) {
+        return childResult
+      }
+
+      return {
+        ok: true,
+        value: {
+          ...objectValue,
+          [currentSegment]: childResult.value,
+        },
+      }
+    }
+
+    if (nextKey !== currentSegment && Object.hasOwn(objectValue, nextKey)) {
+      return {
+        ok: false,
+        issue: getDuplicateKeyIssue(nextKey),
+      }
+    }
+
+    return {
+      ok: true,
+      value: Object.entries(objectValue).reduce<Record<string, unknown>>((renamedObject, [key, childValue]) => {
+        renamedObject[key === currentSegment ? nextKey : key] = childValue
+        return renamedObject
+      }, {}),
+    }
+  }
+
+  return { ok: false, issue: getPathIssue(`$/${pathSegments.join('/')}`) }
+}
+
 function isExpandableValue(value: unknown) {
   return (
     (Array.isArray(value) && value.length > 0) ||
@@ -101,6 +265,20 @@ export function getJsonValueKind(value: unknown): JsonValueKind {
 
 export function toJsonTreeChildPath(parentPath: string, key: string | number) {
   return `${parentPath}/${String(key).replace(/~/g, '~0').replace(/\//g, '~1')}`
+}
+
+export function parseJsonEditableValue(source: string): unknown {
+  const trimmedSource = source.trim()
+
+  if (!trimmedSource) {
+    return ''
+  }
+
+  try {
+    return JSON.parse(trimmedSource)
+  } catch {
+    return source
+  }
 }
 
 export function collectExpandableJsonPaths(value: unknown, rootPath = '$'): string[] {
@@ -179,6 +357,54 @@ export function sortJsonDocumentKeys(source: string, spaces = 2): JsonTransformR
   return {
     ok: true,
     output: JSON.stringify(sortValue(result.value), null, spaces),
+  }
+}
+
+export function updateJsonDocumentValue(source: string, path: string, nextValue: unknown, spaces = 2): JsonTransformResult {
+  const result = parseJsonDocument(source)
+  const pathSegments = decodeJsonTreePath(path)
+
+  if (!result.ok) {
+    return { ok: false, issue: result.issue }
+  }
+
+  if (!pathSegments) {
+    return { ok: false, issue: getPathIssue(path) }
+  }
+
+  const editResult = updateValueAtPath(result.value, pathSegments, nextValue)
+
+  if (!editResult.ok) {
+    return { ok: false, issue: editResult.issue }
+  }
+
+  return {
+    ok: true,
+    output: JSON.stringify(editResult.value, null, spaces),
+  }
+}
+
+export function updateJsonDocumentKey(source: string, path: string, nextKey: string, spaces = 2): JsonTransformResult {
+  const result = parseJsonDocument(source)
+  const pathSegments = decodeJsonTreePath(path)
+
+  if (!result.ok) {
+    return { ok: false, issue: result.issue }
+  }
+
+  if (!pathSegments) {
+    return { ok: false, issue: getPathIssue(path) }
+  }
+
+  const editResult = renameKeyAtPath(result.value, pathSegments, nextKey)
+
+  if (!editResult.ok) {
+    return { ok: false, issue: editResult.issue }
+  }
+
+  return {
+    ok: true,
+    output: JSON.stringify(editResult.value, null, spaces),
   }
 }
 
