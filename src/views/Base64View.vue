@@ -49,6 +49,51 @@ function getAlphabetLabel(record: Base64HistoryRecord) {
       <h1>Base64 編碼/解碼</h1>
     </header>
 
+    <section class="base64-settings" aria-label="Base64 設定">
+      <div class="base64-settings__controls">
+        <SegmentedControl v-model="operation" label="操作" :options="base64OperationOptions" />
+        <div class="base64-format">
+          <SegmentedControl v-model="alphabet" label="格式" :options="base64AlphabetOptions" />
+          <span class="base64-tooltip">
+            <button
+              class="base64-tooltip__trigger"
+              type="button"
+              aria-label="格式說明"
+              aria-describedby="base64-format-help"
+            >
+              ?
+            </button>
+            <span id="base64-format-help" class="base64-tooltip__content" role="tooltip">
+              標準格式適合一般文字與資料交換；URL-safe 會用 - 和 _ 取代 + 和 /，並省略尾端 =，適合放在網址、Query string 或檔名中。
+            </span>
+          </span>
+        </div>
+      </div>
+
+      <div class="base64-settings__actions">
+        <div class="base64-status" :data-valid="isValid">
+          <span class="base64-status__dot" aria-hidden="true"></span>
+          <span>{{ isValid ? '可轉換' : issue }}</span>
+        </div>
+
+        <button class="button button--primary" type="button" :disabled="!isValid" @click="saveHistoryRecord">
+          記錄本次
+        </button>
+      </div>
+
+      <div
+        v-if="copyState === 'failed' || historyState !== 'idle'"
+        class="base64-feedback-list"
+        aria-live="polite"
+      >
+        <p v-if="copyState === 'failed'" class="base64-feedback">無法存取剪貼簿，請手動選取輸出內容複製。</p>
+        <p v-if="historyState === 'saved'" class="base64-feedback base64-feedback--muted">已加入紀錄。</p>
+        <p v-if="historyState === 'duplicate'" class="base64-feedback base64-feedback--muted">已移到紀錄最上方。</p>
+        <p v-if="historyState === 'empty'" class="base64-feedback">沒有可記錄的內容。</p>
+        <p v-if="historyState === 'invalid'" class="base64-feedback">請先修正輸入內容。</p>
+      </div>
+    </section>
+
     <section class="base64-workbench" aria-label="Base64 編碼與解碼">
       <div class="base64-editor">
         <section class="base64-panel" aria-label="輸入內容">
@@ -131,77 +176,55 @@ function getAlphabetLabel(record: Base64HistoryRecord) {
           </dl>
         </section>
       </div>
+    </section>
 
-      <aside class="base64-sidebar" aria-label="Base64 設定與紀錄">
-        <section class="base64-settings" aria-label="Base64 設定">
-          <SegmentedControl v-model="operation" label="操作" :options="base64OperationOptions" />
-          <div class="base64-format">
-            <SegmentedControl v-model="alphabet" label="格式" :options="base64AlphabetOptions" />
-            <span class="base64-tooltip">
-              <button
-                class="base64-tooltip__trigger"
-                type="button"
-                aria-label="格式說明"
-                aria-describedby="base64-format-help"
-              >
-                ?
-              </button>
-              <span id="base64-format-help" class="base64-tooltip__content" role="tooltip">
-                標準格式適合一般文字與資料交換；URL-safe 會用 - 和 _ 取代 + 和 /，並省略尾端 =，適合放在網址、Query string 或檔名中。
-              </span>
-            </span>
-          </div>
+    <section class="base64-history" aria-label="轉換紀錄">
+      <div class="base64-history__rail" aria-hidden="true">
+        <span class="base64-history__rail-count">{{ history.length }}</span>
+        <span class="base64-history__rail-label">紀錄</span>
+      </div>
 
-          <div class="base64-status" :data-valid="isValid">
-            <span class="base64-status__dot" aria-hidden="true"></span>
-            <span>{{ isValid ? '可轉換' : issue }}</span>
-          </div>
-
-          <button class="button button--primary" type="button" :disabled="!isValid" @click="saveHistoryRecord">
-            記錄本次
+      <div class="base64-history__panel">
+        <div class="base64-history__header">
+          <h2>轉換紀錄</h2>
+          <button class="text-button" type="button" :disabled="history.length === 0" @click="clearHistory">
+            全部刪除
           </button>
+        </div>
 
-          <p v-if="copyState === 'failed'" class="base64-feedback">無法存取剪貼簿，請手動選取輸出內容複製。</p>
-          <p v-if="historyState === 'saved'" class="base64-feedback base64-feedback--muted">已加入紀錄。</p>
-          <p v-if="historyState === 'duplicate'" class="base64-feedback base64-feedback--muted">已移到紀錄最上方。</p>
-          <p v-if="historyState === 'empty'" class="base64-feedback">沒有可記錄的內容。</p>
-          <p v-if="historyState === 'invalid'" class="base64-feedback">請先修正輸入內容。</p>
-        </section>
+        <div class="base64-history__body">
+          <div v-if="history.length === 0" class="base64-history__empty">尚無紀錄</div>
 
-        <section class="base64-history" aria-label="轉換紀錄">
-          <div class="base64-history__header">
-            <h2>轉換紀錄</h2>
-            <button class="text-button" type="button" :disabled="history.length === 0" @click="clearHistory">
-              全部刪除
-            </button>
-          </div>
-
-          <div class="base64-history__body">
-            <div v-if="history.length === 0" class="base64-history__empty">尚無紀錄</div>
-
-            <div v-else class="base64-history__list">
-              <article v-for="record in history" :key="record.id" class="history-item">
-                <button class="history-item__main" type="button" @click="loadHistoryRecord(record)">
-                  <span class="history-item__meta">
-                    {{ getOperationLabel(record) }} · {{ getAlphabetLabel(record) }} · {{ formatRecordDate(record.createdAt) }}
+          <div v-else class="base64-history__list">
+            <article v-for="record in history" :key="record.id" class="history-item">
+              <button class="history-item__main" type="button" @click="loadHistoryRecord(record)">
+                <span class="history-item__meta">
+                  {{ getOperationLabel(record) }} · {{ getAlphabetLabel(record) }} · {{ formatRecordDate(record.createdAt) }}
+                </span>
+                <span class="history-item__content">
+                  <span class="history-item__field">
+                    <span class="history-item__label">輸入</span>
+                    <span class="history-item__text">{{ record.input }}</span>
                   </span>
-                  <span class="history-item__text">{{ record.input }}</span>
-                  <span class="history-item__result">{{ record.output }}</span>
-                </button>
-                <button
-                  class="history-item__delete"
-                  type="button"
-                  aria-label="刪除紀錄"
-                  title="刪除紀錄"
-                  @click="deleteHistoryRecord(record.id)"
-                >
-                  ×
-                </button>
-              </article>
-            </div>
+                  <span class="history-item__field">
+                    <span class="history-item__label">輸出</span>
+                    <span class="history-item__result">{{ record.output }}</span>
+                  </span>
+                </span>
+              </button>
+              <button
+                class="history-item__delete"
+                type="button"
+                aria-label="刪除紀錄"
+                title="刪除紀錄"
+                @click="deleteHistoryRecord(record.id)"
+              >
+                ×
+              </button>
+            </article>
           </div>
-        </section>
-      </aside>
+        </div>
+      </div>
     </section>
   </section>
 </template>
@@ -210,7 +233,7 @@ function getAlphabetLabel(record: Base64HistoryRecord) {
 .base64-page {
   display: grid;
   gap: var(--space-5);
-  max-width: 1280px;
+  max-width: 1320px;
   margin: 0 auto;
 }
 
@@ -223,11 +246,6 @@ function getAlphabetLabel(record: Base64HistoryRecord) {
 }
 
 .base64-workbench {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 320px;
-  height: calc(100svh - 156px);
-  min-height: 560px;
-  max-height: 760px;
   overflow: hidden;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-xl);
@@ -237,9 +255,9 @@ function getAlphabetLabel(record: Base64HistoryRecord) {
 
 .base64-editor {
   display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   min-width: 0;
-  min-height: 0;
-  grid-template-rows: 1fr 1fr;
+  min-height: clamp(360px, calc(100svh - 430px), 520px);
 }
 
 .base64-panel {
@@ -247,11 +265,11 @@ function getAlphabetLabel(record: Base64HistoryRecord) {
   min-width: 0;
   min-height: 0;
   grid-template-rows: auto minmax(0, 1fr) auto;
-  border-bottom: 1px solid var(--color-border);
+  border-right: 1px solid var(--color-border);
 }
 
 .base64-panel:last-child {
-  border-bottom: 0;
+  border-right: 0;
 }
 
 .base64-panel__header {
@@ -355,26 +373,42 @@ function getAlphabetLabel(record: Base64HistoryRecord) {
   font-weight: 800;
 }
 
-.base64-sidebar {
+.base64-settings {
   display: grid;
-  min-height: 0;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
   gap: var(--space-4);
-  overflow: hidden;
   padding: var(--space-4);
-  border-left: 1px solid var(--color-border);
-  background: var(--color-surface-muted);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-panel);
 }
 
-.base64-settings,
-.base64-history {
+.base64-settings__controls {
   display: grid;
+  grid-template-columns: repeat(2, minmax(220px, 280px));
   gap: var(--space-4);
+  min-width: 0;
 }
 
-.base64-history {
-  min-height: 0;
-  grid-template-rows: auto minmax(0, 1fr);
+.base64-settings__actions {
+  display: flex;
+  align-items: end;
+  gap: var(--space-3);
+  min-width: min(420px, 100%);
+}
+
+.base64-settings :deep(.segmented-control) {
+  min-width: 0;
+}
+
+.base64-settings :deep(.segmented-control legend) {
+  margin-bottom: var(--space-2);
+}
+
+.base64-settings :deep(.segmented-control__button) {
+  min-height: 38px;
 }
 
 .base64-status {
@@ -382,11 +416,20 @@ function getAlphabetLabel(record: Base64HistoryRecord) {
   align-items: center;
   gap: var(--space-2);
   min-height: 40px;
+  min-width: 0;
+  flex: 1;
   padding: 0 var(--space-3);
   border-radius: var(--radius-md);
   color: var(--color-danger);
-  background: var(--color-surface);
+  background: var(--color-surface-muted);
   font-weight: 850;
+}
+
+.base64-status span:last-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .base64-format {
@@ -466,11 +509,83 @@ function getAlphabetLabel(record: Base64HistoryRecord) {
   padding: var(--space-3);
   border-radius: var(--radius-md);
   color: var(--color-danger);
-  background: var(--color-surface);
+  background: var(--color-surface-muted);
 }
 
 .base64-feedback--muted {
   color: var(--color-text-muted);
+}
+
+.base64-feedback-list {
+  display: flex;
+  flex-wrap: wrap;
+  grid-column: 1 / -1;
+  gap: var(--space-3);
+}
+
+.base64-history {
+  display: grid;
+  position: fixed;
+  top: 72px;
+  right: 0;
+  bottom: var(--space-4);
+  z-index: 20;
+  grid-template-columns: 48px minmax(0, 360px);
+  gap: 0;
+  width: 408px;
+  transform: translateX(360px);
+  transition: transform 0.18s ease;
+}
+
+.base64-history:hover,
+.base64-history:focus-within {
+  transform: translateX(0);
+}
+
+.base64-history__rail {
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+  border: 1px solid var(--color-border);
+  border-right: 0;
+  border-radius: var(--radius-lg) 0 0 var(--radius-lg);
+  color: var(--color-text-strong);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-panel);
+}
+
+.base64-history__rail-count {
+  display: grid;
+  min-width: 26px;
+  height: 26px;
+  place-items: center;
+  border-radius: var(--radius-sm);
+  color: var(--color-on-primary);
+  background: var(--color-primary);
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  font-weight: 900;
+}
+
+.base64-history__rail-label {
+  writing-mode: vertical-rl;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+}
+
+.base64-history__panel {
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: var(--space-4);
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg) 0 0 var(--radius-lg);
+  background: var(--color-surface-muted);
+  box-shadow: var(--shadow-panel);
 }
 
 .base64-history__header {
@@ -531,7 +646,7 @@ function getAlphabetLabel(record: Base64HistoryRecord) {
 .history-item__main {
   display: grid;
   min-width: 0;
-  gap: var(--space-1);
+  gap: var(--space-2);
   padding: 0;
   border: 0;
   color: inherit;
@@ -544,6 +659,24 @@ function getAlphabetLabel(record: Base64HistoryRecord) {
   color: var(--color-text-soft);
   font-size: 0.78rem;
   font-weight: 800;
+}
+
+.history-item__content {
+  display: grid;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.history-item__field {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.history-item__label {
+  color: var(--color-text-soft);
+  font-size: 0.72rem;
+  font-weight: 850;
 }
 
 .history-item__text,
@@ -634,22 +767,49 @@ function getAlphabetLabel(record: Base64HistoryRecord) {
 }
 
 @media (max-width: 980px) {
-  .base64-workbench {
+  .base64-settings {
     grid-template-columns: 1fr;
-    height: auto;
-    min-height: 0;
-    max-height: none;
   }
 
-  .base64-sidebar {
-    grid-template-rows: auto;
-    overflow: visible;
-    border-top: 1px solid var(--color-border);
-    border-left: 0;
+  .base64-settings__actions {
+    min-width: 0;
+  }
+
+  .base64-editor {
+    grid-template-columns: 1fr;
+    min-height: 0;
+  }
+
+  .base64-panel {
+    min-height: 360px;
+    border-right: 0;
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .base64-panel:last-child {
+    border-bottom: 0;
+  }
+
+  .base64-history {
+    position: static;
+    grid-template-columns: 1fr;
+    gap: 0;
+    width: auto;
+    transform: none;
+  }
+
+  .base64-history__rail {
+    display: none;
+  }
+
+  .base64-history__panel {
+    border-radius: var(--radius-xl);
   }
 
   .base64-history__list {
-    max-height: 420px;
+    max-height: none;
+    overflow: visible;
+    padding-right: 0;
   }
 }
 
@@ -670,6 +830,20 @@ function getAlphabetLabel(record: Base64HistoryRecord) {
     display: flex;
     align-self: flex-start;
     flex-direction: row;
+  }
+
+  .base64-settings__controls,
+  .base64-settings__actions,
+  .history-item__content {
+    grid-template-columns: 1fr;
+  }
+
+  .base64-settings__actions {
+    display: grid;
+  }
+
+  .base64-settings :deep(.segmented-control__options) {
+    grid-template-columns: repeat(var(--segmented-control-option-count), minmax(0, 1fr));
   }
 
   .button.base64-panel__action-button {
