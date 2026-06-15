@@ -1,7 +1,9 @@
 ﻿import { describe, expect, it } from 'vitest'
 import {
+  addJsonDocumentItem,
   collectExpandableJsonPaths,
   compactJsonDocument,
+  deleteJsonDocumentItem,
   formatJsonDocument,
   getJsonDocumentStats,
   parseJsonEditableValue,
@@ -97,5 +99,40 @@ describe('jsonEditor', () => {
 
     expect(result.ok).toBe(true)
     expect(result.output).toBe('{\n  "a/b": {\n    "c~d": "new"\n  }\n}')
+  })
+
+  it('adds a default key to an object node', () => {
+    const result = addJsonDocumentItem('{"settings":{"newKey":1}}', '$/settings')
+
+    expect(result.ok).toBe(true)
+    expect(result.output).toBe('{\n  "settings": {\n    "newKey": 1,\n    "newKey1": null\n  }\n}')
+  })
+
+  it('appends a null item to an array node', () => {
+    const result = addJsonDocumentItem('{"items":[1,2]}', '$/items')
+
+    expect(result.ok).toBe(true)
+    expect(result.output).toBe('{\n  "items": [\n    1,\n    2,\n    null\n  ]\n}')
+  })
+
+  it('deletes an object property by tree path', () => {
+    const result = deleteJsonDocumentItem('{"settings":{"theme":"system","localOnly":true}}', '$/settings/localOnly')
+
+    expect(result.ok).toBe(true)
+    expect(result.output).toBe('{\n  "settings": {\n    "theme": "system"\n  }\n}')
+  })
+
+  it('deletes an array item by tree path', () => {
+    const result = deleteJsonDocumentItem('{"items":["first","second","third"]}', '$/items/1')
+
+    expect(result.ok).toBe(true)
+    expect(result.output).toBe('{\n  "items": [\n    "first",\n    "third"\n  ]\n}')
+  })
+
+  it('does not delete the root node', () => {
+    const result = deleteJsonDocumentItem('{"enabled":true}', '$')
+
+    expect(result.ok).toBe(false)
+    expect(result.issue?.message).toContain('root')
   })
 })

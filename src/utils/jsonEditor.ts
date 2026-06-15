@@ -107,6 +107,36 @@ function getDuplicateKeyIssue(key: string): JsonParseIssue {
   }
 }
 
+function getRootDeleteIssue(): JsonParseIssue {
+  return {
+    message: 'root 節點不可刪除。',
+  }
+}
+
+function getContainerIssue(path: string): JsonParseIssue {
+  return {
+    message: `節點不是可新增項目的 object 或 array：${path}`,
+  }
+}
+
+function createDefaultObjectKey(objectValue: Record<string, unknown>) {
+  const baseKey = 'newKey'
+
+  if (!Object.hasOwn(objectValue, baseKey)) {
+    return baseKey
+  }
+
+  let index = 1
+  let nextKey = `${baseKey}${index}`
+
+  while (Object.hasOwn(objectValue, nextKey)) {
+    index += 1
+    nextKey = `${baseKey}${index}`
+  }
+
+  return nextKey
+}
+
 function updateValueAtPath(value: unknown, pathSegments: string[], nextValue: unknown): JsonTreeEditResult {
   if (pathSegments.length === 0) {
     return {
@@ -147,6 +177,157 @@ function updateValueAtPath(value: unknown, pathSegments: string[], nextValue: un
     }
 
     const childResult = updateValueAtPath(objectValue[currentSegment], childSegments, nextValue)
+
+    if (!childResult.ok) {
+      return childResult
+    }
+
+    return {
+      ok: true,
+      value: {
+        ...objectValue,
+        [currentSegment]: childResult.value,
+      },
+    }
+  }
+
+  return { ok: false, issue: getPathIssue(`$/${pathSegments.join('/')}`) }
+}
+
+function addItemAtPath(value: unknown, pathSegments: string[], nextValue: unknown): JsonTreeEditResult {
+  if (pathSegments.length === 0) {
+    if (Array.isArray(value)) {
+      return {
+        ok: true,
+        value: [...value, nextValue],
+      }
+    }
+
+    if (value !== null && typeof value === 'object') {
+      const objectValue = value as Record<string, unknown>
+      const nextKey = createDefaultObjectKey(objectValue)
+
+      return {
+        ok: true,
+        value: {
+          ...objectValue,
+          [nextKey]: nextValue,
+        },
+      }
+    }
+
+    return { ok: false, issue: getContainerIssue('$') }
+  }
+
+  const [currentSegment, ...childSegments] = pathSegments
+
+  if (Array.isArray(value)) {
+    const index = Number(currentSegment)
+
+    if (!Number.isInteger(index) || index < 0 || index >= value.length) {
+      return { ok: false, issue: getPathIssue(`$/${pathSegments.join('/')}`) }
+    }
+
+    const childResult = addItemAtPath(value[index], childSegments, nextValue)
+
+    if (!childResult.ok) {
+      return childResult
+    }
+
+    const nextArray = [...value]
+    nextArray[index] = childResult.value
+
+    return {
+      ok: true,
+      value: nextArray,
+    }
+  }
+
+  if (value !== null && typeof value === 'object') {
+    const objectValue = value as Record<string, unknown>
+
+    if (!Object.hasOwn(objectValue, currentSegment)) {
+      return { ok: false, issue: getPathIssue(`$/${pathSegments.join('/')}`) }
+    }
+
+    const childResult = addItemAtPath(objectValue[currentSegment], childSegments, nextValue)
+
+    if (!childResult.ok) {
+      return childResult
+    }
+
+    return {
+      ok: true,
+      value: {
+        ...objectValue,
+        [currentSegment]: childResult.value,
+      },
+    }
+  }
+
+  return { ok: false, issue: getPathIssue(`$/${pathSegments.join('/')}`) }
+}
+
+function deleteItemAtPath(value: unknown, pathSegments: string[]): JsonTreeEditResult {
+  if (pathSegments.length === 0) {
+    return {
+      ok: false,
+      issue: getRootDeleteIssue(),
+    }
+  }
+
+  const [currentSegment, ...childSegments] = pathSegments
+
+  if (Array.isArray(value)) {
+    const index = Number(currentSegment)
+
+    if (!Number.isInteger(index) || index < 0 || index >= value.length) {
+      return { ok: false, issue: getPathIssue(`$/${pathSegments.join('/')}`) }
+    }
+
+    if (childSegments.length === 0) {
+      return {
+        ok: true,
+        value: value.filter((_, childIndex) => childIndex !== index),
+      }
+    }
+
+    const childResult = deleteItemAtPath(value[index], childSegments)
+
+    if (!childResult.ok) {
+      return childResult
+    }
+
+    const nextArray = [...value]
+    nextArray[index] = childResult.value
+
+    return {
+      ok: true,
+      value: nextArray,
+    }
+  }
+
+  if (value !== null && typeof value === 'object') {
+    const objectValue = value as Record<string, unknown>
+
+    if (!Object.hasOwn(objectValue, currentSegment)) {
+      return { ok: false, issue: getPathIssue(`$/${pathSegments.join('/')}`) }
+    }
+
+    if (childSegments.length === 0) {
+      return {
+        ok: true,
+        value: Object.entries(objectValue).reduce<Record<string, unknown>>((nextObject, [key, childValue]) => {
+          if (key !== currentSegment) {
+            nextObject[key] = childValue
+          }
+
+          return nextObject
+        }, {}),
+      }
+    }
+
+    const childResult = deleteItemAtPath(objectValue[currentSegment], childSegments)
 
     if (!childResult.ok) {
       return childResult
@@ -397,6 +578,54 @@ export function updateJsonDocumentKey(source: string, path: string, nextKey: str
   }
 
   const editResult = renameKeyAtPath(result.value, pathSegments, nextKey)
+
+  if (!editResult.ok) {
+    return { ok: false, issue: editResult.issue }
+  }
+
+  return {
+    ok: true,
+    output: JSON.stringify(editResult.value, null, spaces),
+  }
+}
+
+export function addJsonDocumentItem(source: string, path: string, nextValue: unknown = null, spaces = 2): JsonTransformResult {
+  const result = parseJsonDocument(source)
+  const pathSegments = decodeJsonTreePath(path)
+
+  if (!result.ok) {
+    return { ok: false, issue: result.issue }
+  }
+
+  if (!pathSegments) {
+    return { ok: false, issue: getPathIssue(path) }
+  }
+
+  const editResult = addItemAtPath(result.value, pathSegments, nextValue)
+
+  if (!editResult.ok) {
+    return { ok: false, issue: editResult.issue }
+  }
+
+  return {
+    ok: true,
+    output: JSON.stringify(editResult.value, null, spaces),
+  }
+}
+
+export function deleteJsonDocumentItem(source: string, path: string, spaces = 2): JsonTransformResult {
+  const result = parseJsonDocument(source)
+  const pathSegments = decodeJsonTreePath(path)
+
+  if (!result.ok) {
+    return { ok: false, issue: result.issue }
+  }
+
+  if (!pathSegments) {
+    return { ok: false, issue: getPathIssue(path) }
+  }
+
+  const editResult = deleteItemAtPath(result.value, pathSegments)
 
   if (!editResult.ok) {
     return { ok: false, issue: editResult.issue }

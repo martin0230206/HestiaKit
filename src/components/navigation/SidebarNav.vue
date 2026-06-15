@@ -270,5 +270,14 @@ const groupedTools = computed(() =>
     display: grid;
     grid-template-columns: 1fr;
   }
+
+  .sidebar--collapsed {
+    padding: var(--space-2) var(--space-4);
+  }
+
+  .sidebar--collapsed .sidebar__collapse {
+    width: 36px;
+    height: 36px;
+  }
 }
 </style>

@@ -15,6 +15,8 @@ const props = defineProps<{
   value: unknown
   path: string
   expandedPaths: ReadonlySet<string>
+  addItem: (path: string) => boolean
+  deleteItem: (path: string) => boolean
   togglePath: (path: string) => void
   updateKey: (path: string, nextKey: string) => boolean
   updateValue: (path: string, nextValue: unknown) => boolean
@@ -47,6 +49,8 @@ const isExpandable = computed(() => childEntries.value.length > 0)
 const keyLabel = computed(() => (props.nodeKey === undefined ? 'root' : String(props.nodeKey)))
 const canEditKey = computed(() => typeof props.nodeKey === 'string')
 const canEditValue = computed(() => !Array.isArray(props.value) && (props.value === null || typeof props.value !== 'object'))
+const canAddItem = computed(() => Array.isArray(props.value) || (props.value !== null && typeof props.value === 'object'))
+const canDeleteItem = computed(() => props.path !== '$')
 const editableValueText = computed(() => String(props.value))
 const summary = computed(() => getSummary(props.value, kind.value, childEntries.value.length))
 
@@ -95,7 +99,7 @@ function commitValue(event: Event) {
 
 <template>
   <div class="json-tree-node" :style="{ '--tree-depth': depth ?? 0 }">
-    <div class="json-tree-node__row" :data-kind="kind">
+    <div class="json-tree-node__row" :data-kind="kind" :data-path="path">
       <button
         v-if="isExpandable"
         class="json-tree-node__toggle"
@@ -104,7 +108,7 @@ function commitValue(event: Event) {
         :title="isExpanded ? '收合' : '展開'"
         @click="togglePath(path)"
       >
-        {{ isExpanded ? '-' : '+' }}
+        {{ isExpanded ? '▾' : '▸' }}
       </button>
       <span v-else class="json-tree-node__spacer" aria-hidden="true"></span>
 
@@ -133,6 +137,31 @@ function commitValue(event: Event) {
         @keydown.enter.prevent="commitValue"
       />
       <span v-else class="json-tree-node__summary">{{ summary }}</span>
+
+      <span class="json-tree-node__actions">
+        <button
+          v-if="canAddItem"
+          class="json-tree-node__action"
+          type="button"
+          aria-label="新增項目"
+          title="新增項目"
+          @click="addItem(path)"
+        >
+          +
+        </button>
+        <span v-else class="json-tree-node__action-spacer" aria-hidden="true"></span>
+        <button
+          v-if="canDeleteItem"
+          class="json-tree-node__action json-tree-node__action--danger"
+          type="button"
+          aria-label="刪除項目"
+          title="刪除項目"
+          @click="deleteItem(path)"
+        >
+          ×
+        </button>
+        <span v-else class="json-tree-node__action-spacer" aria-hidden="true"></span>
+      </span>
     </div>
 
     <div v-if="isExpandable && isExpanded" class="json-tree-node__children">
@@ -143,6 +172,8 @@ function commitValue(event: Event) {
         :path="entry.path"
         :node-key="entry.key"
         :expanded-paths="expandedPaths"
+        :add-item="addItem"
+        :delete-item="deleteItem"
         :toggle-path="togglePath"
         :update-key="updateKey"
         :update-value="updateValue"
@@ -159,9 +190,10 @@ function commitValue(event: Event) {
 
 .json-tree-node__row {
   display: grid;
-  grid-template-columns: 28px minmax(90px, 0.75fr) minmax(76px, 0.35fr) minmax(0, 1.4fr);
+  grid-template-columns: 28px minmax(90px, 0.75fr) minmax(76px, 0.35fr) minmax(0, 1.4fr) 62px;
   align-items: center;
   gap: var(--space-2);
+  min-width: 700px;
   min-height: 34px;
   padding: 0 var(--space-3) 0 calc(var(--space-3) + var(--tree-depth) * 22px);
   border-bottom: 1px solid var(--color-border);
@@ -260,9 +292,49 @@ function commitValue(event: Event) {
   box-shadow: 0 0 0 1px var(--color-focus);
 }
 
+.json-tree-node__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 3px;
+  min-width: 0;
+}
+
+.json-tree-node__action,
+.json-tree-node__action-spacer {
+  width: 26px;
+  height: 26px;
+}
+
+.json-tree-node__action {
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-primary-strong);
+  background: var(--color-surface);
+  font: inherit;
+  font-family: var(--font-mono);
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.json-tree-node__action:hover {
+  border-color: var(--color-primary);
+  background: var(--color-primary-soft);
+}
+
+.json-tree-node__action--danger {
+  color: var(--color-danger);
+}
+
+.json-tree-node__action:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
 @media (max-width: 720px) {
   .json-tree-node__row {
-    grid-template-columns: 28px minmax(72px, 0.8fr) minmax(0, 1.2fr);
+    grid-template-columns: 28px minmax(72px, 0.8fr) minmax(0, 1.2fr) 62px;
   }
 
   .json-tree-node__type {

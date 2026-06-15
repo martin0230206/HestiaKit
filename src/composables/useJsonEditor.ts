@@ -1,7 +1,9 @@
 ﻿import { computed, ref, watch } from 'vue'
 import {
+  addJsonDocumentItem,
   collectExpandableJsonPaths,
   compactJsonDocument,
+  deleteJsonDocumentItem,
   formatJsonDocument,
   getJsonDocumentStats,
   parseJsonDocument,
@@ -161,6 +163,28 @@ export function useJsonEditor() {
     return result.ok
   }
 
+  function addTreeItem(path: string) {
+    const result = addJsonDocumentItem(source.value, path)
+
+    applyTransform(result, '已新增項目')
+
+    if (result.ok) {
+      const nextExpandedPaths = new Set(expandedPaths.value)
+      nextExpandedPaths.add(path)
+      expandedPaths.value = nextExpandedPaths
+    }
+
+    return result.ok
+  }
+
+  function deleteTreeItem(path: string) {
+    const result = deleteJsonDocumentItem(source.value, path)
+
+    applyTransform(result, '已刪除項目')
+
+    return result.ok
+  }
+
   function setViewMode(nextViewMode: JsonEditorViewMode) {
     viewMode.value = nextViewMode
   }
@@ -262,6 +286,8 @@ export function useJsonEditor() {
     compactJson,
     copyJson,
     copyState,
+    addTreeItem,
+    deleteTreeItem,
     downloadJson,
     expandTree,
     expandedPaths,

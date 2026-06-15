@@ -4,11 +4,13 @@ import JsonTreeNode from '../components/json-editor/JsonTreeNode.vue'
 import { useJsonEditor } from '../composables/useJsonEditor'
 
 const {
+  addTreeItem,
   clearJson,
   collapseTree,
   compactJson,
   copyJson,
   copyState,
+  deleteTreeItem,
   downloadJson,
   expandTree,
   expandedPaths,
@@ -86,10 +88,14 @@ function handleFileChange(event: Event) {
             <span aria-hidden="true">{}</span>
           </button>
           <button class="icon-button" type="button" aria-label="開啟檔案" title="開啟檔案" @click="openFilePicker">
-            <span aria-hidden="true">↑</span>
+            <span class="file-transfer-icon file-transfer-icon--upload" aria-hidden="true">
+              <span class="file-transfer-icon__arrow"></span>
+            </span>
           </button>
           <button class="icon-button" type="button" aria-label="下載 JSON" title="下載 JSON" :disabled="!source" @click="downloadJson">
-            <span aria-hidden="true">↓</span>
+            <span class="file-transfer-icon file-transfer-icon--download" aria-hidden="true">
+              <span class="file-transfer-icon__arrow"></span>
+            </span>
           </button>
           <button class="icon-button icon-button--danger" type="button" aria-label="清空" title="清空" :disabled="!source" @click="clearJson">
             <span aria-hidden="true">×</span>
@@ -113,10 +119,16 @@ function handleFileChange(event: Event) {
 
         <div class="json-toolbar__group" aria-label="樹狀操作">
           <button class="icon-button" type="button" aria-label="展開全部" title="展開全部" :disabled="viewMode !== 'tree' || !isValid" @click="expandTree">
-            <span aria-hidden="true">＋</span>
+            <span class="tree-action-icon tree-action-icon--expand" aria-hidden="true">
+              <span class="tree-action-icon__chevron tree-action-icon__chevron--up"></span>
+              <span class="tree-action-icon__chevron tree-action-icon__chevron--down"></span>
+            </span>
           </button>
           <button class="icon-button" type="button" aria-label="收合全部" title="收合全部" :disabled="viewMode !== 'tree' || !isValid" @click="collapseTree">
-            <span aria-hidden="true">－</span>
+            <span class="tree-action-icon tree-action-icon--collapse" aria-hidden="true">
+              <span class="tree-action-icon__chevron tree-action-icon__chevron--down"></span>
+              <span class="tree-action-icon__chevron tree-action-icon__chevron--up"></span>
+            </span>
           </button>
         </div>
 
@@ -149,6 +161,7 @@ function handleFileChange(event: Event) {
               <span>key</span>
               <span>type</span>
               <span>value</span>
+              <span>actions</span>
             </div>
 
             <JsonTreeNode
@@ -156,6 +169,8 @@ function handleFileChange(event: Event) {
               :value="treeValue"
               path="$"
               :expanded-paths="expandedPaths"
+              :add-item="addTreeItem"
+              :delete-item="deleteTreeItem"
               :toggle-path="toggleTreePath"
               :update-key="updateTreeKey"
               :update-value="updateTreeValue"
@@ -300,9 +315,9 @@ function handleFileChange(event: Event) {
   top: 0;
   z-index: 1;
   display: grid;
-  grid-template-columns: 28px minmax(90px, 0.75fr) minmax(76px, 0.35fr) minmax(0, 1.4fr);
+  grid-template-columns: 28px minmax(90px, 0.75fr) minmax(76px, 0.35fr) minmax(0, 1.4fr) 62px;
   gap: var(--space-2);
-  min-width: 620px;
+  min-width: 700px;
   padding: var(--space-2) var(--space-3);
   border-bottom: 1px solid var(--color-border);
   color: var(--color-text-soft);
@@ -453,6 +468,143 @@ function handleFileChange(event: Event) {
   outline-offset: 2px;
 }
 
+.file-transfer-icon {
+  position: relative;
+  width: 18px;
+  height: 18px;
+}
+
+.file-transfer-icon::after {
+  position: absolute;
+  right: 2px;
+  bottom: 1px;
+  left: 2px;
+  height: 5px;
+  border: 2px solid currentColor;
+  border-top: 0;
+  border-radius: 0 0 3px 3px;
+  content: '';
+}
+
+.file-transfer-icon__arrow {
+  position: absolute;
+  left: 50%;
+  width: 2px;
+  height: 10px;
+  border-radius: 999px;
+  background: currentColor;
+  transform: translateX(-50%);
+}
+
+.file-transfer-icon__arrow::before,
+.file-transfer-icon__arrow::after {
+  position: absolute;
+  width: 7px;
+  height: 2px;
+  border-radius: 999px;
+  background: currentColor;
+  content: '';
+}
+
+.file-transfer-icon--upload .file-transfer-icon__arrow {
+  top: 2px;
+}
+
+.file-transfer-icon--upload .file-transfer-icon__arrow::before,
+.file-transfer-icon--upload .file-transfer-icon__arrow::after {
+  top: 1px;
+}
+
+.file-transfer-icon--upload .file-transfer-icon__arrow::before {
+  right: 0;
+  transform: rotate(-45deg);
+  transform-origin: right center;
+}
+
+.file-transfer-icon--upload .file-transfer-icon__arrow::after {
+  left: 0;
+  transform: rotate(45deg);
+  transform-origin: left center;
+}
+
+.file-transfer-icon--download .file-transfer-icon__arrow {
+  top: 1px;
+}
+
+.file-transfer-icon--download .file-transfer-icon__arrow::before,
+.file-transfer-icon--download .file-transfer-icon__arrow::after {
+  bottom: 1px;
+}
+
+.file-transfer-icon--download .file-transfer-icon__arrow::before {
+  right: 0;
+  transform: rotate(45deg);
+  transform-origin: right center;
+}
+
+.file-transfer-icon--download .file-transfer-icon__arrow::after {
+  left: 0;
+  transform: rotate(-45deg);
+  transform-origin: left center;
+}
+
+.tree-action-icon {
+  position: relative;
+  width: 18px;
+  height: 18px;
+}
+
+.tree-action-icon__chevron {
+  position: absolute;
+  left: 50%;
+  width: 12px;
+  height: 6px;
+  transform: translateX(-50%);
+}
+
+.tree-action-icon__chevron:first-child {
+  top: 1px;
+}
+
+.tree-action-icon__chevron:last-child {
+  bottom: 1px;
+}
+
+.tree-action-icon__chevron::before,
+.tree-action-icon__chevron::after {
+  position: absolute;
+  top: 2px;
+  width: 8px;
+  height: 2px;
+  border-radius: 999px;
+  background: currentColor;
+  content: '';
+}
+
+.tree-action-icon__chevron::before {
+  left: 0;
+}
+
+.tree-action-icon__chevron::after {
+  right: 0;
+}
+
+.tree-action-icon__chevron--up::before {
+  transform: rotate(-38deg);
+}
+
+.tree-action-icon__chevron--up::after {
+  transform: rotate(38deg);
+}
+
+.tree-action-icon__chevron--down::before {
+  transform: rotate(38deg);
+}
+
+.tree-action-icon__chevron--down::after {
+  transform: rotate(-38deg);
+}
+
 @media (max-width: 900px) {
   .json-editor {
     grid-template-columns: 1fr;
@@ -466,7 +618,7 @@ function handleFileChange(event: Event) {
 
 @media (max-width: 720px) {
   .json-tree__header {
-    grid-template-columns: 28px minmax(72px, 0.8fr) minmax(0, 1.2fr);
+    grid-template-columns: 28px minmax(72px, 0.8fr) minmax(0, 1.2fr) 62px;
   }
 
   .json-tree__header span:nth-child(3) {
