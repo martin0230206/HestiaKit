@@ -88,7 +88,7 @@ function commitKey(event: Event) {
 }
 
 function commitValue(event: Event) {
-  const input = event.target as HTMLInputElement
+  const input = event.target as HTMLTextAreaElement
   const nextValue = parseJsonEditableValue(input.value)
 
   if (!Object.is(nextValue, props.value)) {
@@ -125,17 +125,18 @@ function commitValue(event: Event) {
       />
       <span v-else class="json-tree-node__key">{{ keyLabel }}</span>
       <span class="json-tree-node__type">{{ kind }}</span>
-      <input
+      <textarea
         v-if="canEditValue"
         class="json-tree-node__value-input"
-        type="text"
         :value="editableValueText"
+        rows="1"
         aria-label="編輯 value"
         spellcheck="false"
         autocomplete="off"
+        wrap="soft"
         @change="commitValue"
         @keydown.enter.prevent="commitValue"
-      />
+      ></textarea>
       <span v-else class="json-tree-node__summary">{{ summary }}</span>
 
       <span class="json-tree-node__actions">
@@ -190,10 +191,11 @@ function commitValue(event: Event) {
 
 .json-tree-node__row {
   display: grid;
-  grid-template-columns: 28px minmax(90px, 0.75fr) minmax(76px, 0.35fr) minmax(0, 1.4fr) 62px;
+  grid-template-columns: 28px minmax(220px, 0.9fr) minmax(76px, 0.35fr) minmax(160px, 1.25fr) 62px;
   align-items: center;
   gap: var(--space-2);
-  min-width: 700px;
+  width: 100%;
+  min-width: 760px;
   min-height: 34px;
   padding: 0 var(--space-3) 0 calc(var(--space-3) + var(--tree-depth) * 22px);
   border-bottom: 1px solid var(--color-border);
@@ -234,11 +236,14 @@ function commitValue(event: Event) {
 .json-tree-node__key,
 .json-tree-node__key-input {
   min-width: 0;
-  overflow: hidden;
   color: var(--color-text-strong);
   font-weight: 800;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.35;
+}
+
+.json-tree-node__key {
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 
 .json-tree-node__type {
@@ -251,16 +256,14 @@ function commitValue(event: Event) {
 .json-tree-node__summary,
 .json-tree-node__value-input {
   min-width: 0;
-  overflow: hidden;
   color: var(--color-text-muted);
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
 }
 
 .json-tree-node__key-input,
 .json-tree-node__value-input {
   width: 100%;
-  height: 26px;
   padding: 0 var(--space-2);
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
@@ -269,13 +272,19 @@ function commitValue(event: Event) {
 }
 
 .json-tree-node__key-input {
+  height: 26px;
   color: var(--color-text-strong);
   font-weight: 800;
 }
 
 .json-tree-node__value-input {
+  min-height: 26px;
+  field-sizing: content;
+  overflow: hidden;
+  resize: none;
   color: var(--color-text-muted);
   font-family: var(--font-mono);
+  line-height: 1.45;
 }
 
 .json-tree-node__key-input:hover,
@@ -334,7 +343,7 @@ function commitValue(event: Event) {
 
 @media (max-width: 720px) {
   .json-tree-node__row {
-    grid-template-columns: 28px minmax(72px, 0.8fr) minmax(0, 1.2fr) 62px;
+    grid-template-columns: 28px minmax(220px, 1fr) minmax(160px, 1fr) 62px;
   }
 
   .json-tree-node__type {

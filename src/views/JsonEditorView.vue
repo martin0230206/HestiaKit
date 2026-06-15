@@ -315,9 +315,10 @@ function handleFileChange(event: Event) {
   top: 0;
   z-index: 1;
   display: grid;
-  grid-template-columns: 28px minmax(90px, 0.75fr) minmax(76px, 0.35fr) minmax(0, 1.4fr) 62px;
+  grid-template-columns: 28px minmax(220px, 0.9fr) minmax(76px, 0.35fr) minmax(160px, 1.25fr) 62px;
   gap: var(--space-2);
-  min-width: 700px;
+  width: 100%;
+  min-width: 760px;
   padding: var(--space-2) var(--space-3);
   border-bottom: 1px solid var(--color-border);
   color: var(--color-text-soft);
@@ -618,7 +619,7 @@ function handleFileChange(event: Event) {
 
 @media (max-width: 720px) {
   .json-tree__header {
-    grid-template-columns: 28px minmax(72px, 0.8fr) minmax(0, 1.2fr) 62px;
+    grid-template-columns: 28px minmax(220px, 1fr) minmax(160px, 1fr) 62px;
   }
 
   .json-tree__header span:nth-child(3) {
