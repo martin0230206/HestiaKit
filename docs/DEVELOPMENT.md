@@ -110,7 +110,7 @@ src/
 目前工具分類：
 
 - `security`：密碼產生器、金鑰或安全輔助工具。
-- `encoding`：Base64、URL、Hex、SHA 等編碼、解碼、雜湊工具。
+- `encoding`：Base64、MD5、URL、Hex、SHA 等編碼、解碼、雜湊工具。
 - `format`：JSON、XML 等格式化、驗證、檢視工具。
 
 ## View 與 Composable 分工

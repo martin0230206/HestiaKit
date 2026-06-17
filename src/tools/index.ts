@@ -2,6 +2,7 @@ import type { Component } from 'vue'
 import Base64View from '../views/Base64View.vue'
 import ClipboardMarkdownView from '../views/ClipboardMarkdownView.vue'
 import JsonEditorView from '../views/JsonEditorView.vue'
+import Md5View from '../views/Md5View.vue'
 import PasswordGeneratorView from '../views/PasswordGeneratorView.vue'
 
 export interface ToolCategoryDefinition {
@@ -49,6 +50,14 @@ export const tools: ToolDefinition[] = [
     icon: '64',
     categoryId: 'encoding',
     component: Base64View,
+  },
+  {
+    name: 'md5',
+    path: 'md5',
+    label: 'MD5',
+    icon: '#',
+    categoryId: 'encoding',
+    component: Md5View,
   },
   {
     name: 'json-editor',
