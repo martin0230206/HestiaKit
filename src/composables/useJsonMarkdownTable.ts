@@ -3,10 +3,12 @@ import { getJsonDocumentStats } from '../utils/jsonEditor'
 import {
   convertJsonToMarkdownTable,
   getMarkdownTableStats,
+  type JsonMarkdownTableMode,
 } from '../utils/jsonMarkdownTable'
 import { getMarkdownDocumentStats } from '../utils/clipboardMarkdown'
 
 interface StoredJsonMarkdownTableState {
+  mode?: JsonMarkdownTableMode
   source?: string
 }
 
@@ -14,24 +16,51 @@ const storageKey = 'hestiakit-json-markdown-table'
 const sampleJson = JSON.stringify(
   [
     {
-      name: '密碼產生器',
-      category: '安全工具',
-      localOnly: true,
+      orderId: 'A001',
+      customer: {
+        name: 'Customer A',
+        email: 'customer-a@example.com',
+      },
+      tags: ['urgent', 'web'],
+      items: [
+        {
+          name: 'Keyboard',
+          qty: 1,
+        },
+        {
+          name: 'Mouse',
+          qty: 2,
+        },
+      ],
     },
     {
-      name: 'JSON 編輯器',
-      category: '格式工具',
-      localOnly: true,
-    },
-    {
-      name: '剪貼簿轉 Markdown',
-      category: '格式工具',
-      localOnly: true,
+      orderId: 'A002',
+      customer: {
+        name: 'Customer B',
+        email: 'customer-b@example.com',
+      },
+      tags: ['internal'],
+      items: [
+        {
+          name: 'Monitor',
+          qty: 1,
+        },
+      ],
     },
   ],
   null,
   2,
 )
+
+export const jsonMarkdownTableModeOptions: Array<{ label: string; value: JsonMarkdownTableMode }> = [
+  { label: '保守', value: 'conservative' },
+  { label: '攤平', value: 'flatten' },
+  { label: '多表格', value: 'multi-table' },
+]
+
+function normalizeMode(mode: unknown): JsonMarkdownTableMode {
+  return mode === 'flatten' || mode === 'multi-table' || mode === 'conservative' ? mode : 'conservative'
+}
 
 function readStoredState(): StoredJsonMarkdownTableState {
   try {
@@ -55,9 +84,10 @@ function writeStoredState(state: StoredJsonMarkdownTableState) {
 export function useJsonMarkdownTable() {
   const storedState = readStoredState()
   const source = ref(storedState.source ?? sampleJson)
+  const mode = ref<JsonMarkdownTableMode>(normalizeMode(storedState.mode))
   const copyState = ref<'idle' | 'copied' | 'failed'>('idle')
 
-  const transformResult = computed(() => convertJsonToMarkdownTable(source.value))
+  const transformResult = computed(() => convertJsonToMarkdownTable(source.value, { mode: mode.value }))
   const output = computed(() => transformResult.value.output)
   const isValid = computed(() => transformResult.value.ok)
   const issue = computed(() => transformResult.value.issue)
@@ -91,13 +121,14 @@ export function useJsonMarkdownTable() {
     }
   }
 
-  watch(source, () => {
+  watch([source, mode], () => {
     writeStoredState({
+      mode: mode.value,
       source: source.value,
     })
   }, { immediate: true })
 
-  watch(source, () => {
+  watch([source, mode], () => {
     copyState.value = 'idle'
   })
 
@@ -109,6 +140,8 @@ export function useJsonMarkdownTable() {
     isValid,
     issue,
     loadSample,
+    mode,
+    modeOptions: jsonMarkdownTableModeOptions,
     output,
     outputStats,
     source,

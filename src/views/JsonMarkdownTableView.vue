@@ -10,6 +10,8 @@ const {
   isValid,
   issue,
   loadSample,
+  mode,
+  modeOptions,
   output,
   outputStats,
   source,
@@ -53,6 +55,22 @@ const issueLocation = computed(() => formatIssueLocation(issue.value))
           >
             <span aria-hidden="true">{{ copyState === 'copied' ? '✓' : '⧉' }}</span>
           </button>
+        </div>
+
+        <div class="json-table-mode" role="group" aria-label="轉換模式">
+          <span class="json-table-mode__label">模式</span>
+          <div class="json-table-mode__options">
+            <button
+              v-for="option in modeOptions"
+              :key="option.value"
+              class="json-table-mode__button"
+              :class="{ 'json-table-mode__button--active': mode === option.value }"
+              type="button"
+              @click="mode = option.value"
+            >
+              {{ option.label }}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -185,6 +203,8 @@ const issueLocation = computed(() => formatIssueLocation(issue.value))
 .json-table-toolbar {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
   gap: var(--space-2);
   padding: var(--space-3);
   border-bottom: 1px solid var(--color-border);
@@ -198,6 +218,56 @@ const issueLocation = computed(() => formatIssueLocation(issue.value))
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   background: var(--color-surface);
+}
+
+.json-table-mode {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  margin: 0;
+}
+
+.json-table-mode__label {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.json-table-mode__options {
+  display: flex;
+  gap: 3px;
+  padding: 3px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+.json-table-mode__button {
+  min-height: 34px;
+  min-width: 58px;
+  padding: 0 var(--space-3);
+  border: 0;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-muted);
+  background: transparent;
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.json-table-mode__button:hover:not(.json-table-mode__button--active) {
+  color: var(--color-text-strong);
+  background: var(--color-surface-muted);
+}
+
+.json-table-mode__button--active {
+  color: var(--color-primary-strong);
+  background: var(--color-primary-soft);
 }
 
 .json-table-editor {
@@ -422,7 +492,8 @@ const issueLocation = computed(() => formatIssueLocation(issue.value))
 }
 
 .button:focus-visible,
-.icon-button:focus-visible {
+.icon-button:focus-visible,
+.json-table-mode__button:focus-visible {
   outline: 2px solid var(--color-focus);
   outline-offset: 2px;
 }
@@ -464,10 +535,16 @@ const issueLocation = computed(() => formatIssueLocation(issue.value))
   }
 
   .json-table-toolbar__group,
+  .json-table-mode,
   .json-table-stats,
   .json-table-panel__header {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .json-table-mode__options {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .icon-button {
