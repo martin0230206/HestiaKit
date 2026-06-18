@@ -35,6 +35,8 @@ docker compose down
 - Base64：支援 UTF-8 文字編碼、解碼、URL-safe 格式與本機轉換紀錄。
 - MD5：支援 UTF-8 文字雜湊、小寫/大寫輸出與本機雜湊紀錄。
 - JSON 編輯器：支援文字與樹狀檢視、展開/收合、格式化、壓縮、排序 key、即時驗證、本機匯入與下載。
+- JSON 轉表格：支援 JSON 陣列、物件與基本型別轉換成 Markdown 表格。
+- 剪貼簿轉 Markdown：支援 HTML 與純文字貼上後轉換成 Markdown。
 
 ## 開發文件
 

@@ -2,6 +2,7 @@ import type { Component } from 'vue'
 import Base64View from '../views/Base64View.vue'
 import ClipboardMarkdownView from '../views/ClipboardMarkdownView.vue'
 import JsonEditorView from '../views/JsonEditorView.vue'
+import JsonMarkdownTableView from '../views/JsonMarkdownTableView.vue'
 import Md5View from '../views/Md5View.vue'
 import PasswordGeneratorView from '../views/PasswordGeneratorView.vue'
 
@@ -66,6 +67,14 @@ export const tools: ToolDefinition[] = [
     icon: '{}',
     categoryId: 'format',
     component: JsonEditorView,
+  },
+  {
+    name: 'json-markdown-table',
+    path: 'json-markdown-table',
+    label: 'JSON 轉表格',
+    icon: '| |',
+    categoryId: 'format',
+    component: JsonMarkdownTableView,
   },
   {
     name: 'clipboard-markdown',
