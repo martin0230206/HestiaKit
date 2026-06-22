@@ -40,7 +40,7 @@ docker compose down
 
 ## 開發文件
 
-後續開發請遵循 [HestiaKit 開發規格](docs/DEVELOPMENT.md)，包含架構分層、檔案結構、新增工具流程、測試與部署規則。
+後續開發請遵循 [HestiaKit 開發規格](AGENTS.md)，包含架構分層、檔案結構、新增工具流程、測試與部署規則。
 
 ## 技術
 
