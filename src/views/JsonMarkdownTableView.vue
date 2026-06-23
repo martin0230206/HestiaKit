@@ -179,7 +179,7 @@ const issueLocation = computed(() => formatIssueLocation(issue.value))
 .json-table-page {
   display: grid;
   gap: var(--space-6);
-  max-width: 1280px;
+  max-width: 1440px;
   margin: 0 auto;
 }
 
@@ -273,7 +273,7 @@ const issueLocation = computed(() => formatIssueLocation(issue.value))
 .json-table-editor {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 280px;
-  min-height: 660px;
+  min-height: 720px;
 }
 
 .json-table-editor__main {

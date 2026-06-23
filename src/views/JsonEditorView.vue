@@ -5,6 +5,7 @@ import { useJsonEditor } from '../composables/useJsonEditor'
 
 const {
   addTreeItem,
+  canRepair,
   clearJson,
   collapseTree,
   compactJson,
@@ -22,6 +23,8 @@ const {
   issueLocation,
   lastAction,
   loadSample,
+  repairActions,
+  repairJson,
   setViewMode,
   sortKeys,
   source,
@@ -85,7 +88,9 @@ function handleFileChange(event: Event) {
 
         <div class="json-toolbar__group" aria-label="文件操作">
           <button class="icon-button" type="button" aria-label="載入範例" title="載入範例" @click="loadSample">
-            <span aria-hidden="true">{}</span>
+            <span class="sample-document-icon" aria-hidden="true">
+              <span class="sample-document-icon__line"></span>
+            </span>
           </button>
           <button class="icon-button" type="button" aria-label="開啟檔案" title="開啟檔案" @click="openFilePicker">
             <span class="file-transfer-icon file-transfer-icon--upload" aria-hidden="true">
@@ -205,6 +210,17 @@ function handleFileChange(event: Event) {
             <p>{{ issue.message }}</p>
           </div>
 
+          <div v-if="canRepair" class="json-status__repair">
+            <p class="json-status__repair-title">偵測到可修復項目</p>
+            <ul class="json-status__repair-list">
+              <li v-for="action in repairActions" :key="action.kind">
+                <span>{{ action.label }}</span>
+                <span>{{ action.count }} 處</span>
+              </li>
+            </ul>
+            <button class="json-status__repair-button" type="button" @click="repairJson">自動修復</button>
+          </div>
+
           <p v-if="copyState === 'failed'" class="json-status__feedback">無法存取剪貼簿，請手動選取內容複製。</p>
           <p v-if="fileState === 'failed'" class="json-status__feedback">無法讀取檔案。</p>
           <p v-if="lastAction" class="json-status__action">{{ lastAction }}</p>
@@ -218,7 +234,7 @@ function handleFileChange(event: Event) {
 .json-page {
   display: grid;
   gap: var(--space-6);
-  max-width: 1180px;
+  max-width: 1440px;
   margin: 0 auto;
 }
 
@@ -263,8 +279,8 @@ function handleFileChange(event: Event) {
 
 .json-editor {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 270px;
-  min-height: 620px;
+  grid-template-columns: minmax(0, 1fr) 290px;
+  min-height: 720px;
 }
 
 .json-editor__main,
@@ -285,7 +301,7 @@ function handleFileChange(event: Event) {
 .json-editor__textarea {
   width: 100%;
   min-width: 0;
-  min-height: 560px;
+  min-height: 660px;
   resize: vertical;
   padding: var(--space-4);
   border: 0;
@@ -305,7 +321,7 @@ function handleFileChange(event: Event) {
 
 .json-tree {
   min-width: 0;
-  min-height: 620px;
+  min-height: 720px;
   overflow: auto;
   background: var(--color-surface);
 }
@@ -401,6 +417,7 @@ function handleFileChange(event: Event) {
 }
 
 .json-status__issue,
+.json-status__repair,
 .json-status__feedback,
 .json-status__action {
   margin: 0;
@@ -423,6 +440,63 @@ function handleFileChange(event: Event) {
 
 .json-status__issue-title {
   font-weight: 850;
+}
+
+.json-status__repair {
+  display: grid;
+  gap: var(--space-3);
+  color: var(--color-text);
+}
+
+.json-status__repair-title {
+  margin: 0;
+  color: var(--color-text-strong);
+  font-weight: 850;
+}
+
+.json-status__repair-list {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.json-status__repair-list li {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+}
+
+.json-status__repair-list span:last-child {
+  flex: 0 0 auto;
+  color: var(--color-text-strong);
+  font-family: var(--font-mono);
+  font-weight: 800;
+}
+
+.json-status__repair-button {
+  min-height: 36px;
+  padding: 0 var(--space-3);
+  border: 0;
+  border-radius: var(--radius-sm);
+  color: var(--color-on-primary);
+  background: var(--color-primary);
+  font: inherit;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.json-status__repair-button:hover {
+  background: var(--color-primary-hover);
+}
+
+.json-status__repair-button:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
 }
 
 .json-status__feedback {
@@ -467,6 +541,55 @@ function handleFileChange(event: Event) {
 .icon-button:focus-visible {
   outline: 2px solid var(--color-focus);
   outline-offset: 2px;
+}
+
+.sample-document-icon {
+  position: relative;
+  width: 18px;
+  height: 18px;
+}
+
+.sample-document-icon::before {
+  position: absolute;
+  top: 1px;
+  left: 3px;
+  width: 12px;
+  height: 16px;
+  border: 2px solid currentColor;
+  border-radius: 3px;
+  content: '';
+}
+
+.sample-document-icon::after {
+  position: absolute;
+  top: 3px;
+  right: 1px;
+  width: 5px;
+  height: 5px;
+  border-bottom: 2px solid currentColor;
+  border-left: 2px solid currentColor;
+  background: var(--color-surface);
+  content: '';
+}
+
+.sample-document-icon__line,
+.sample-document-icon__line::before {
+  position: absolute;
+  left: 6px;
+  width: 6px;
+  height: 2px;
+  border-radius: 999px;
+  background: currentColor;
+  content: '';
+}
+
+.sample-document-icon__line {
+  top: 9px;
+}
+
+.sample-document-icon__line::before {
+  top: 4px;
+  left: 0;
 }
 
 .file-transfer-icon {

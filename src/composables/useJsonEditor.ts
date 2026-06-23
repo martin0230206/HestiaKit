@@ -7,6 +7,7 @@ import {
   formatJsonDocument,
   getJsonDocumentStats,
   parseJsonDocument,
+  repairJsonDocument,
   sortJsonDocumentKeys,
   toJsonTreeChildPath,
   updateJsonDocumentKey,
@@ -106,7 +107,16 @@ export function useJsonEditor() {
   const stats = computed(() => getJsonDocumentStats(source.value))
   const isValid = computed(() => parseResult.value.ok)
   const issue = computed(() => parseResult.value.issue)
-  const statusLabel = computed(() => (isValid.value ? '有效 JSON' : 'JSON 格式錯誤'))
+  const repairResult = computed(() => (isValid.value ? { ok: false, actions: [] } : repairJsonDocument(source.value)))
+  const canRepair = computed(() => repairResult.value.ok && repairResult.value.output !== undefined)
+  const repairActions = computed(() => (canRepair.value ? repairResult.value.actions : []))
+  const statusLabel = computed(() => {
+    if (isValid.value) {
+      return '有效 JSON'
+    }
+
+    return canRepair.value ? 'JSON 格式錯誤，可自動修復' : 'JSON 格式錯誤'
+  })
   const issueLocation = computed(() => {
     if (!issue.value?.line || !issue.value.column) {
       return ''
@@ -137,6 +147,20 @@ export function useJsonEditor() {
 
   function sortKeys() {
     applyTransform(sortJsonDocumentKeys(source.value), '已排序 key')
+  }
+
+  function repairJson() {
+    copyState.value = 'idle'
+
+    if (!canRepair.value || repairResult.value.output === undefined) {
+      lastAction.value = '沒有可自動修復的常見 JSON 錯誤。'
+      return
+    }
+
+    const repairedCount = repairResult.value.actions.reduce((total, action) => total + action.count, 0)
+
+    source.value = repairResult.value.output
+    lastAction.value = `已自動修復 ${repairedCount} 處常見錯誤`
   }
 
   function updateTreeKey(path: string, nextKey: string) {
@@ -287,6 +311,7 @@ export function useJsonEditor() {
     copyJson,
     copyState,
     addTreeItem,
+    canRepair,
     deleteTreeItem,
     downloadJson,
     expandTree,
@@ -299,6 +324,8 @@ export function useJsonEditor() {
     issueLocation,
     lastAction,
     loadSample,
+    repairActions,
+    repairJson,
     setViewMode,
     sortKeys,
     source,

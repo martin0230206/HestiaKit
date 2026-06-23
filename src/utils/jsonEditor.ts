@@ -17,6 +17,24 @@ export interface JsonTransformResult {
   issue?: JsonParseIssue
 }
 
+export type JsonRepairKind =
+  | 'comment'
+  | 'literal'
+  | 'single-quoted-string'
+  | 'smart-quote'
+  | 'trailing-comma'
+  | 'unquoted-key'
+
+export interface JsonRepairAction {
+  kind: JsonRepairKind
+  label: string
+  count: number
+}
+
+export interface JsonRepairResult extends JsonTransformResult {
+  actions: JsonRepairAction[]
+}
+
 export interface JsonTreeEditResult extends JsonTransformResult {
   value?: unknown
 }
@@ -61,6 +79,360 @@ function getLineColumnFromPosition(source: string, position: number) {
   const column = lines[lines.length - 1].length + 1
 
   return { line, column }
+}
+
+const jsonRepairActionOrder: JsonRepairKind[] = [
+  'comment',
+  'trailing-comma',
+  'single-quoted-string',
+  'smart-quote',
+  'unquoted-key',
+  'literal',
+]
+
+const jsonRepairLabels: Record<JsonRepairKind, string> = {
+  comment: '移除 JavaScript 註解',
+  literal: '轉換非 JSON literal',
+  'single-quoted-string': '將單引號字串改成雙引號',
+  'smart-quote': '將智慧引號改成標準雙引號',
+  'trailing-comma': '移除結尾逗號',
+  'unquoted-key': '補上未加引號的 key',
+}
+
+const nonJsonLiteralReplacements: Record<string, string> = {
+  FALSE: 'false',
+  False: 'false',
+  NULL: 'null',
+  None: 'null',
+  TRUE: 'true',
+  True: 'true',
+  Undefined: 'null',
+  undefined: 'null',
+}
+
+function recordJsonRepair(counts: Map<JsonRepairKind, number>, kind: JsonRepairKind) {
+  counts.set(kind, (counts.get(kind) ?? 0) + 1)
+}
+
+function getJsonRepairActions(counts: ReadonlyMap<JsonRepairKind, number>): JsonRepairAction[] {
+  return jsonRepairActionOrder.flatMap((kind) => {
+    const count = counts.get(kind) ?? 0
+
+    return count > 0
+      ? [
+          {
+            kind,
+            label: jsonRepairLabels[kind],
+            count,
+          },
+        ]
+      : []
+  })
+}
+
+function isJsonWhitespace(char: string | undefined) {
+  return char === ' ' || char === '\n' || char === '\r' || char === '\t'
+}
+
+function skipJsonWhitespace(source: string, startIndex: number) {
+  let index = startIndex
+
+  while (isJsonWhitespace(source[index])) {
+    index += 1
+  }
+
+  return index
+}
+
+function isIdentifierStart(char: string | undefined) {
+  return Boolean(char && /[A-Za-z_$]/.test(char))
+}
+
+function isIdentifierPart(char: string | undefined) {
+  return Boolean(char && /[A-Za-z0-9_$-]/.test(char))
+}
+
+function isSmartSingleQuote(char: string | undefined) {
+  return char === '‘' || char === '’'
+}
+
+function isSmartDoubleQuote(char: string | undefined) {
+  return char === '“' || char === '”'
+}
+
+function copyDoubleQuotedString(source: string, startIndex: number) {
+  let output = source[startIndex]
+  let index = startIndex + 1
+
+  while (index < source.length) {
+    const char = source[index]
+    output += char
+
+    if (char === '\\' && index + 1 < source.length) {
+      index += 1
+      output += source[index]
+      index += 1
+      continue
+    }
+
+    if (char === '"') {
+      return {
+        endIndex: index,
+        output,
+      }
+    }
+
+    index += 1
+  }
+
+  return {
+    endIndex: source.length - 1,
+    output,
+  }
+}
+
+function isRepairableQuoteEnd(char: string | undefined, quoteKind: 'single' | 'smart-double' | 'smart-single') {
+  if (quoteKind === 'smart-double') {
+    return isSmartDoubleQuote(char)
+  }
+
+  if (quoteKind === 'smart-single') {
+    return char === "'" || isSmartSingleQuote(char)
+  }
+
+  return char === "'"
+}
+
+function repairQuotedString(
+  source: string,
+  startIndex: number,
+  quoteKind: 'single' | 'smart-double' | 'smart-single',
+) {
+  let output = '"'
+  let index = startIndex + 1
+
+  while (index < source.length) {
+    const char = source[index]
+
+    if (char === '\\') {
+      const nextChar = source[index + 1]
+
+      if (nextChar === undefined) {
+        return {
+          endIndex: source.length - 1,
+          output: source.slice(startIndex),
+          repaired: false,
+        }
+      }
+
+      if (quoteKind !== 'smart-double' && (nextChar === "'" || isSmartSingleQuote(nextChar))) {
+        output += nextChar === "'" ? "'" : nextChar
+        index += 2
+        continue
+      }
+
+      output += `\\${nextChar}`
+      index += 2
+      continue
+    }
+
+    if (isRepairableQuoteEnd(char, quoteKind)) {
+      output += '"'
+
+      return {
+        endIndex: index,
+        output,
+        repaired: true,
+      }
+    }
+
+    if (char === '"') {
+      output += '\\"'
+      index += 1
+      continue
+    }
+
+    if (char === '\r') {
+      output += '\\n'
+      index += source[index + 1] === '\n' ? 2 : 1
+      continue
+    }
+
+    if (char === '\n') {
+      output += '\\n'
+      index += 1
+      continue
+    }
+
+    output += char
+    index += 1
+  }
+
+  return {
+    endIndex: source.length - 1,
+    output: source.slice(startIndex),
+    repaired: false,
+  }
+}
+
+function removeJsonLikeCommentsAndNormalizeQuotes(source: string, counts: Map<JsonRepairKind, number>) {
+  let output = ''
+  let index = 0
+
+  while (index < source.length) {
+    const char = source[index]
+    const nextChar = source[index + 1]
+
+    if (char === '\uFEFF' && output.length === 0) {
+      index += 1
+      continue
+    }
+
+    if (char === '"') {
+      const quotedString = copyDoubleQuotedString(source, index)
+      output += quotedString.output
+      index = quotedString.endIndex + 1
+      continue
+    }
+
+    if (char === "'" || isSmartSingleQuote(char) || isSmartDoubleQuote(char)) {
+      const quoteKind = char === "'" ? 'single' : isSmartDoubleQuote(char) ? 'smart-double' : 'smart-single'
+      const quotedString = repairQuotedString(source, index, quoteKind)
+
+      output += quotedString.output
+
+      if (quotedString.repaired) {
+        recordJsonRepair(counts, quoteKind === 'single' ? 'single-quoted-string' : 'smart-quote')
+      }
+
+      index = quotedString.endIndex + 1
+      continue
+    }
+
+    if (char === '/' && nextChar === '/') {
+      recordJsonRepair(counts, 'comment')
+      index += 2
+
+      while (index < source.length && source[index] !== '\n' && source[index] !== '\r') {
+        index += 1
+      }
+
+      continue
+    }
+
+    if (char === '/' && nextChar === '*') {
+      recordJsonRepair(counts, 'comment')
+      index += 2
+
+      while (index < source.length) {
+        const blockChar = source[index]
+
+        if (blockChar === '*' && source[index + 1] === '/') {
+          index += 2
+          break
+        }
+
+        if (blockChar === '\r') {
+          output += blockChar
+
+          if (source[index + 1] === '\n') {
+            output += '\n'
+            index += 2
+          } else {
+            index += 1
+          }
+
+          continue
+        }
+
+        if (blockChar === '\n') {
+          output += blockChar
+        }
+
+        index += 1
+      }
+
+      continue
+    }
+
+    output += char
+    index += 1
+  }
+
+  return output
+}
+
+function repairLooseJsonTokens(source: string, counts: Map<JsonRepairKind, number>) {
+  let output = ''
+  let index = 0
+
+  while (index < source.length) {
+    const char = source[index]
+
+    if (char === '"') {
+      const quotedString = copyDoubleQuotedString(source, index)
+      output += quotedString.output
+      index = quotedString.endIndex + 1
+      continue
+    }
+
+    if (char === ',') {
+      const nextTokenIndex = skipJsonWhitespace(source, index + 1)
+      const nextToken = source[nextTokenIndex]
+
+      if (nextToken === '}' || nextToken === ']') {
+        recordJsonRepair(counts, 'trailing-comma')
+        index += 1
+        continue
+      }
+
+      output += char
+      index += 1
+      continue
+    }
+
+    if (isIdentifierStart(char)) {
+      const startIndex = index
+
+      while (isIdentifierPart(source[index])) {
+        index += 1
+      }
+
+      const token = source.slice(startIndex, index)
+      const nextTokenIndex = skipJsonWhitespace(source, index)
+
+      if (source[nextTokenIndex] === ':') {
+        output += JSON.stringify(token)
+        recordJsonRepair(counts, 'unquoted-key')
+        continue
+      }
+
+      if (Object.hasOwn(nonJsonLiteralReplacements, token)) {
+        output += nonJsonLiteralReplacements[token]
+        recordJsonRepair(counts, 'literal')
+        continue
+      }
+
+      output += token
+      continue
+    }
+
+    output += char
+    index += 1
+  }
+
+  return output
+}
+
+function buildJsonRepairCandidate(source: string) {
+  const counts = new Map<JsonRepairKind, number>()
+  const withoutComments = removeJsonLikeCommentsAndNormalizeQuotes(source, counts)
+  const output = repairLooseJsonTokens(withoutComments, counts)
+
+  return {
+    actions: getJsonRepairActions(counts),
+    output,
+  }
 }
 
 function sortValue(value: unknown): unknown {
@@ -538,6 +910,36 @@ export function sortJsonDocumentKeys(source: string, spaces = 2): JsonTransformR
   return {
     ok: true,
     output: JSON.stringify(sortValue(result.value), null, spaces),
+  }
+}
+
+export function repairJsonDocument(source: string, spaces = 2): JsonRepairResult {
+  const candidate = buildJsonRepairCandidate(source)
+
+  if (candidate.actions.length === 0) {
+    return {
+      ok: false,
+      actions: [],
+      issue: parseJsonDocument(source).issue ?? {
+        message: '未找到可自動修復的常見 JSON 錯誤。',
+      },
+    }
+  }
+
+  const result = parseJsonDocument(candidate.output)
+
+  if (!result.ok) {
+    return {
+      ok: false,
+      actions: candidate.actions,
+      issue: result.issue,
+    }
+  }
+
+  return {
+    ok: true,
+    actions: candidate.actions,
+    output: JSON.stringify(result.value, null, spaces),
   }
 }
 

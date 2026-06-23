@@ -8,6 +8,7 @@ import {
   getJsonDocumentStats,
   parseJsonEditableValue,
   parseJsonDocument,
+  repairJsonDocument,
   sortJsonDocumentKeys,
   updateJsonDocumentKey,
   updateJsonDocumentValue,
@@ -42,6 +43,42 @@ describe('jsonEditor', () => {
 
     expect(result.ok).toBe(false)
     expect(result.issue?.message).toBeTruthy()
+  })
+
+  it('repairs comments and trailing commas when the candidate becomes valid JSON', () => {
+    const result = repairJsonDocument('{\n  // project name\n  "name": "HestiaKit",\n  "tools": [\n    "json-editor",\n  ],\n}')
+
+    expect(result.ok).toBe(true)
+    expect(result.actions.map((action) => action.kind)).toEqual(['comment', 'trailing-comma'])
+    expect(result.output).toBe('{\n  "name": "HestiaKit",\n  "tools": [\n    "json-editor"\n  ]\n}')
+  })
+
+  it('repairs single-quoted strings, unquoted keys, and non-JSON literals', () => {
+    const result = repairJsonDocument("{ project: 'HestiaKit', privacy: True, missing: None }")
+
+    expect(result.ok).toBe(true)
+    expect(result.actions.map((action) => action.kind)).toEqual([
+      'single-quoted-string',
+      'unquoted-key',
+      'literal',
+    ])
+    expect(result.output).toBe('{\n  "project": "HestiaKit",\n  "privacy": true,\n  "missing": null\n}')
+  })
+
+  it('repairs smart quotes around keys and string values', () => {
+    const result = repairJsonDocument('{ “project”: “HestiaKit” }')
+
+    expect(result.ok).toBe(true)
+    expect(result.actions.map((action) => action.kind)).toEqual(['smart-quote'])
+    expect(result.output).toBe('{\n  "project": "HestiaKit"\n}')
+  })
+
+  it('does not return a repair when the repaired candidate is still invalid', () => {
+    const result = repairJsonDocument('{ project: HestiaKit }')
+
+    expect(result.ok).toBe(false)
+    expect(result.actions.map((action) => action.kind)).toEqual(['unquoted-key'])
+    expect(result.output).toBeUndefined()
   })
 
   it('counts document lines and characters', () => {
