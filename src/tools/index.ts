@@ -1,6 +1,7 @@
 import type { Component } from 'vue'
 import Base64View from '../views/Base64View.vue'
 import ClipboardMarkdownView from '../views/ClipboardMarkdownView.vue'
+import DuplicateItemsView from '../views/DuplicateItemsView.vue'
 import JsonEditorView from '../views/JsonEditorView.vue'
 import JsonMarkdownTableView from '../views/JsonMarkdownTableView.vue'
 import Md5View from '../views/Md5View.vue'
@@ -67,6 +68,14 @@ export const tools: ToolDefinition[] = [
     icon: '{}',
     categoryId: 'format',
     component: JsonEditorView,
+  },
+  {
+    name: 'duplicate-items',
+    path: 'duplicate-items',
+    label: '去除重複項目',
+    icon: '1x',
+    categoryId: 'format',
+    component: DuplicateItemsView,
   },
   {
     name: 'json-markdown-table',
