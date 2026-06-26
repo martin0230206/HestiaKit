@@ -1,6 +1,7 @@
 import type { Component } from 'vue'
 import Base64View from '../views/Base64View.vue'
 import ClipboardMarkdownView from '../views/ClipboardMarkdownView.vue'
+import CsvTableView from '../views/CsvTableView.vue'
 import DuplicateItemsView from '../views/DuplicateItemsView.vue'
 import JsonEditorView from '../views/JsonEditorView.vue'
 import JsonMarkdownTableView from '../views/JsonMarkdownTableView.vue'
@@ -84,6 +85,14 @@ export const tools: ToolDefinition[] = [
     icon: '| |',
     categoryId: 'format',
     component: JsonMarkdownTableView,
+  },
+  {
+    name: 'csv-table',
+    path: 'csv-table',
+    label: 'CSV 表格檢視器',
+    icon: 'CSV',
+    categoryId: 'format',
+    component: CsvTableView,
   },
   {
     name: 'clipboard-markdown',
