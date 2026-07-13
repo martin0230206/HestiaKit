@@ -31,11 +31,18 @@ const appliedTheme = computed<AppliedTheme>(() => {
 function updateDocumentTheme() {
   document.documentElement.dataset.theme = appliedTheme.value
   document.documentElement.dataset.accent = accentPreference.value
+  document.documentElement.classList.toggle('dark', appliedTheme.value === 'dark')
   document.documentElement.style.colorScheme = appliedTheme.value
 }
 
 function readStoredPreference() {
-  const storedPreference = window.localStorage.getItem(storageKey)
+  let storedPreference: string | null = null
+
+  try {
+    storedPreference = window.localStorage.getItem(storageKey)
+  } catch {
+    return
+  }
 
   if (storedPreference === 'system' || storedPreference === 'light' || storedPreference === 'dark') {
     preference.value = storedPreference
@@ -43,7 +50,13 @@ function readStoredPreference() {
 }
 
 function readStoredAccentPreference() {
-  const storedAccentPreference = window.localStorage.getItem(accentStorageKey)
+  let storedAccentPreference: string | null = null
+
+  try {
+    storedAccentPreference = window.localStorage.getItem(accentStorageKey)
+  } catch {
+    return
+  }
 
   if (
     storedAccentPreference === 'amber' ||
@@ -89,13 +102,25 @@ export function useTheme() {
 
   function setTheme(nextPreference: ThemePreference) {
     preference.value = nextPreference
-    window.localStorage.setItem(storageKey, nextPreference)
+
+    try {
+      window.localStorage.setItem(storageKey, nextPreference)
+    } catch {
+      // Storage can be unavailable in private or restricted browser contexts.
+    }
+
     updateDocumentTheme()
   }
 
   function setAccent(nextAccentPreference: DarkAccentPreference) {
     accentPreference.value = nextAccentPreference
-    window.localStorage.setItem(accentStorageKey, nextAccentPreference)
+
+    try {
+      window.localStorage.setItem(accentStorageKey, nextAccentPreference)
+    } catch {
+      // Storage can be unavailable in private or restricted browser contexts.
+    }
+
     updateDocumentTheme()
   }
 

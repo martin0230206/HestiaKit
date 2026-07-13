@@ -1,24 +1,31 @@
-﻿<script setup lang="ts">
-import { ref, watch } from 'vue'
-import SidebarNav from '../components/navigation/SidebarNav.vue'
-import { useTheme } from '../composables/useTheme'
+<script setup lang="ts">
+import { computed, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
+import SidebarNav from '@/components/navigation/SidebarNav.vue'
+import { SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar'
+import { useTheme } from '@/composables/useTheme'
+import { tools } from '@/tools'
 
 const { accentPreference, appliedTheme, preference, setAccent, setTheme } = useTheme()
+const route = useRoute()
 const sidebarCollapsedStorageKey = 'hestiakit-sidebar-collapsed'
 
-function readSidebarCollapsedState() {
+function readSidebarOpenState() {
   try {
-    return window.localStorage.getItem(sidebarCollapsedStorageKey) === 'true'
+    return window.localStorage.getItem(sidebarCollapsedStorageKey) !== 'true'
   } catch {
-    return false
+    return true
   }
 }
 
-const isSidebarCollapsed = ref(readSidebarCollapsedState())
+const isSidebarOpen = ref(readSidebarOpenState())
+const currentToolLabel = computed(
+  () => tools.find((tool) => tool.name === route.name)?.label ?? 'HestiaKit',
+)
 
-watch(isSidebarCollapsed, (isCollapsed) => {
+watch(isSidebarOpen, (isOpen) => {
   try {
-    window.localStorage.setItem(sidebarCollapsedStorageKey, String(isCollapsed))
+    window.localStorage.setItem(sidebarCollapsedStorageKey, String(!isOpen))
   } catch {
     // Storage can be unavailable in private or restricted browser contexts.
   }
@@ -26,52 +33,29 @@ watch(isSidebarCollapsed, (isCollapsed) => {
 </script>
 
 <template>
-  <div class="app-shell" :class="{ 'app-shell--sidebar-collapsed': isSidebarCollapsed }">
+  <SidebarProvider v-model:open="isSidebarOpen" class="bg-sidebar">
     <SidebarNav
-      :is-collapsed="isSidebarCollapsed"
       :accent-preference="accentPreference"
       :applied-theme="appliedTheme"
       :theme-preference="preference"
-      @update:isCollapsed="isSidebarCollapsed = $event"
       @update:accent-preference="setAccent"
       @update:theme-preference="setTheme"
     />
 
-    <main class="app-shell__main">
-      <RouterView />
-    </main>
-  </div>
+    <SidebarInset class="min-w-0 overflow-hidden border border-border/70">
+      <header class="sticky top-0 z-20 flex h-14 items-center gap-3 border-b bg-background/90 px-4 backdrop-blur-xl">
+        <SidebarTrigger aria-label="切換功能列" title="切換功能列" />
+        <div class="h-4 w-px bg-border" aria-hidden="true"></div>
+        <p class="truncate text-sm font-medium text-foreground">{{ currentToolLabel }}</p>
+        <span class="ml-auto hidden items-center gap-1.5 text-xs text-muted-foreground sm:flex">
+          <span class="size-1.5 rounded-full bg-emerald-500"></span>
+          所有資料僅在瀏覽器處理
+        </span>
+      </header>
+
+      <div class="min-w-0 flex-1 overflow-x-hidden p-4 sm:p-6 lg:p-8">
+        <RouterView />
+      </div>
+    </SidebarInset>
+  </SidebarProvider>
 </template>
-
-<style scoped>
-.app-shell {
-  display: grid;
-  min-height: 100svh;
-  grid-template-columns: 292px minmax(0, 1fr);
-  background: var(--color-bg);
-  transition: grid-template-columns 0.18s ease;
-}
-
-.app-shell--sidebar-collapsed {
-  grid-template-columns: 64px minmax(0, 1fr);
-}
-
-.app-shell__main {
-  min-width: 0;
-  padding: var(--space-8);
-}
-
-@media (max-width: 860px) {
-  .app-shell {
-    grid-template-columns: 1fr;
-  }
-
-  .app-shell--sidebar-collapsed {
-    grid-template-columns: 1fr;
-  }
-
-  .app-shell__main {
-    padding: var(--space-4);
-  }
-}
-</style>

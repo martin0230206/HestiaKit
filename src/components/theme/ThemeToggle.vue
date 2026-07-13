@@ -1,6 +1,18 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
-import type { AppliedTheme, DarkAccentPreference, ThemePreference } from '../../composables/useTheme'
+import type { Component } from 'vue'
+import { computed } from 'vue'
+import { ChevronUpIcon, MonitorIcon, MoonIcon, PaletteIcon, SunIcon } from '@lucide/vue'
+import { Button } from '@/components/ui/button'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import type { AppliedTheme, DarkAccentPreference, ThemePreference } from '@/composables/useTheme'
 
 const preference = defineModel<ThemePreference>({ required: true })
 const accentPreference = defineModel<DarkAccentPreference>('accentPreference', { required: true })
@@ -9,234 +21,68 @@ defineProps<{
   appliedTheme: AppliedTheme
 }>()
 
-const options: Array<{ label: string; value: ThemePreference }> = [
-  { label: '系統', value: 'system' },
-  { label: '淺色', value: 'light' },
-  { label: '深色', value: 'dark' },
+const options: Array<{ icon: Component; label: string; value: ThemePreference }> = [
+  { icon: MonitorIcon, label: '跟隨系統', value: 'system' },
+  { icon: SunIcon, label: '淺色', value: 'light' },
+  { icon: MoonIcon, label: '深色', value: 'dark' },
 ]
 
-const accentOptions: Array<{ label: string; value: DarkAccentPreference }> = [
-  { label: '石墨', value: 'graphite' },
-  { label: '午夜藍', value: 'midnight' },
-  { label: '冷杉', value: 'spruce' },
-  { label: '苔灰', value: 'moss' },
-  { label: '霧灰', value: 'mist' },
-  { label: '暖琥珀', value: 'amber' },
-  { label: '森林綠', value: 'emerald' },
-  { label: '深海藍', value: 'cyan' },
-  { label: '暮紫', value: 'violet' },
-  { label: '酒紅', value: 'rose' },
+const accentOptions: Array<{ color: string; label: string; value: DarkAccentPreference }> = [
+  { color: 'var(--accent-swatch-graphite)', label: '石墨', value: 'graphite' },
+  { color: 'var(--accent-swatch-midnight)', label: '午夜藍', value: 'midnight' },
+  { color: 'var(--accent-swatch-spruce)', label: '冷杉', value: 'spruce' },
+  { color: 'var(--accent-swatch-moss)', label: '苔灰', value: 'moss' },
+  { color: 'var(--accent-swatch-mist)', label: '霧灰', value: 'mist' },
+  { color: 'var(--accent-swatch-amber)', label: '暖琥珀', value: 'amber' },
+  { color: 'var(--accent-swatch-emerald)', label: '森林綠', value: 'emerald' },
+  { color: 'var(--accent-swatch-cyan)', label: '深海藍', value: 'cyan' },
+  { color: 'var(--accent-swatch-violet)', label: '暮紫', value: 'violet' },
+  { color: 'var(--accent-swatch-rose)', label: '酒紅', value: 'rose' },
 ]
 
-const isAccentPanelOpen = ref(false)
-const selectedAccentLabel = computed(
-  () => accentOptions.find((option) => option.value === accentPreference.value)?.label ?? '石墨',
-)
+const selectedOption = computed(() => options.find((option) => option.value === preference.value) ?? options[0])
 </script>
 
 <template>
-  <div class="theme-toggle" aria-label="主題切換">
-    <div class="theme-toggle__mode">
-      <button
-        v-for="option in options"
-        :key="option.value"
-        class="theme-toggle__button"
-        :class="{ 'theme-toggle__button--active': preference === option.value }"
-        type="button"
-        @click="preference = option.value"
+  <DropdownMenu>
+    <DropdownMenuTrigger as-child>
+      <Button
+        variant="outline"
+        class="w-full justify-start gap-2 bg-sidebar group-data-[collapsible=icon]:size-8! group-data-[collapsible=icon]:p-2!"
+        aria-label="切換顯示主題"
       >
-        {{ option.label }}
-      </button>
-    </div>
+        <component :is="selectedOption.icon" class="size-4 shrink-0" />
+        <span class="truncate group-data-[collapsible=icon]:hidden">{{ selectedOption.label }}</span>
+        <ChevronUpIcon class="ml-auto size-4 text-muted-foreground group-data-[collapsible=icon]:hidden" />
+      </Button>
+    </DropdownMenuTrigger>
 
-    <section v-if="appliedTheme === 'dark'" class="theme-toggle__accent">
-      <button
-        class="theme-toggle__accent-toggle"
-        type="button"
-        :aria-expanded="isAccentPanelOpen"
-        @click="isAccentPanelOpen = !isAccentPanelOpen"
-      >
-        <span>深色配色</span>
-        <span>{{ selectedAccentLabel }}</span>
-        <span aria-hidden="true">{{ isAccentPanelOpen ? '收合' : '展開' }}</span>
-      </button>
+    <DropdownMenuContent side="right" align="end" class="w-56">
+      <DropdownMenuLabel>顯示主題</DropdownMenuLabel>
+      <DropdownMenuRadioGroup v-model="preference">
+        <DropdownMenuRadioItem v-for="option in options" :key="option.value" :value="option.value">
+          <component :is="option.icon" class="size-4" />
+          {{ option.label }}
+        </DropdownMenuRadioItem>
+      </DropdownMenuRadioGroup>
 
-      <div v-if="isAccentPanelOpen" class="theme-toggle__swatches">
-        <button
-          v-for="option in accentOptions"
-          :key="option.value"
-          class="theme-toggle__swatch"
-          :class="{ 'theme-toggle__swatch--active': accentPreference === option.value }"
-          :data-accent="option.value"
-          type="button"
-          :aria-label="`深色配色：${option.label}`"
-          :title="option.label"
-          @click="accentPreference = option.value"
-        >
-          <span aria-hidden="true"></span>
-          <span>{{ option.label }}</span>
-        </button>
-      </div>
-    </section>
-  </div>
+      <template v-if="appliedTheme === 'dark'">
+        <DropdownMenuSeparator />
+        <DropdownMenuLabel class="flex items-center gap-2">
+          <PaletteIcon class="size-4" />
+          深色配色
+        </DropdownMenuLabel>
+        <DropdownMenuRadioGroup v-model="accentPreference">
+          <DropdownMenuRadioItem
+            v-for="option in accentOptions"
+            :key="option.value"
+            :value="option.value"
+          >
+            <span class="size-3 rounded-full ring-1 ring-border" :style="{ backgroundColor: option.color }"></span>
+            {{ option.label }}
+          </DropdownMenuRadioItem>
+        </DropdownMenuRadioGroup>
+      </template>
+    </DropdownMenuContent>
+  </DropdownMenu>
 </template>
-
-<style scoped>
-.theme-toggle {
-  display: grid;
-  gap: var(--space-3);
-}
-
-.theme-toggle__mode {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 3px;
-  padding: 3px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-surface-muted);
-}
-
-.theme-toggle__button {
-  min-height: 34px;
-  border: 0;
-  border-radius: var(--radius-sm);
-  color: var(--color-text-muted);
-  background: transparent;
-  font: inherit;
-  font-size: 0.82rem;
-  cursor: pointer;
-}
-
-.theme-toggle__button--active {
-  color: var(--color-text);
-  background: var(--color-surface);
-  box-shadow: var(--shadow-control);
-}
-
-.theme-toggle__accent {
-  display: grid;
-  gap: var(--space-2);
-}
-
-.theme-toggle__accent-toggle {
-  display: grid;
-  grid-template-columns: 1fr auto auto;
-  align-items: center;
-  gap: var(--space-2);
-  min-height: 38px;
-  padding: 0 var(--space-3);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  color: var(--color-text-strong);
-  background: var(--color-surface);
-  font: inherit;
-  font-size: 0.84rem;
-  font-weight: 800;
-  cursor: pointer;
-}
-
-.theme-toggle__accent-toggle span:nth-child(2),
-.theme-toggle__accent-toggle span:nth-child(3) {
-  color: var(--color-text-muted);
-  font-size: 0.8rem;
-  font-weight: 750;
-}
-
-.theme-toggle__swatches {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: var(--space-2);
-}
-
-.theme-toggle__swatch {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  align-items: center;
-  gap: var(--space-2);
-  min-height: 34px;
-  padding: 0 var(--space-2);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  color: var(--color-text-muted);
-  background: var(--color-surface);
-  font: inherit;
-  font-size: 0.82rem;
-  font-weight: 700;
-  text-align: left;
-  cursor: pointer;
-}
-
-.theme-toggle__swatch span:first-child {
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: var(--swatch-color);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.22);
-}
-
-.theme-toggle__swatch[data-accent='amber'] {
-  --swatch-color: #f0b35a;
-}
-
-.theme-toggle__swatch[data-accent='graphite'] {
-  --swatch-color: #a8b0bb;
-}
-
-.theme-toggle__swatch[data-accent='midnight'] {
-  --swatch-color: #8eb4ff;
-}
-
-.theme-toggle__swatch[data-accent='spruce'] {
-  --swatch-color: #8fcfb4;
-}
-
-.theme-toggle__swatch[data-accent='moss'] {
-  --swatch-color: #a8c083;
-}
-
-.theme-toggle__swatch[data-accent='mist'] {
-  --swatch-color: #b7c4d1;
-}
-
-.theme-toggle__swatch[data-accent='emerald'] {
-  --swatch-color: #5ee0a0;
-}
-
-.theme-toggle__swatch[data-accent='cyan'] {
-  --swatch-color: #67c7f0;
-}
-
-.theme-toggle__swatch[data-accent='violet'] {
-  --swatch-color: #b8a1ff;
-}
-
-.theme-toggle__swatch[data-accent='rose'] {
-  --swatch-color: #ff8fa3;
-}
-
-.theme-toggle__swatch--active {
-  border-color: var(--color-primary);
-  color: var(--color-text-strong);
-  background: var(--color-primary-soft);
-}
-
-.theme-toggle__accent-toggle:focus-visible,
-.theme-toggle__button:focus-visible,
-.theme-toggle__swatch:focus-visible {
-  outline: 2px solid var(--color-focus);
-  outline-offset: 2px;
-}
-
-@media (max-width: 860px) {
-  .theme-toggle__swatches {
-    grid-template-columns: repeat(auto-fit, minmax(72px, 1fr));
-  }
-
-  .theme-toggle__swatch {
-    justify-items: center;
-    grid-template-columns: 1fr;
-    min-height: 42px;
-  }
-}
-</style>

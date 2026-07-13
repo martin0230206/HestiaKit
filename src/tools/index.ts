@@ -1,4 +1,14 @@
 import type { Component } from 'vue'
+import {
+  BinaryIcon,
+  BracesIcon,
+  ClipboardTypeIcon,
+  FileSpreadsheetIcon,
+  HashIcon,
+  KeyRoundIcon,
+  ListFilterIcon,
+  TablePropertiesIcon,
+} from '@lucide/vue'
 import Base64View from '../views/Base64View.vue'
 import ClipboardMarkdownView from '../views/ClipboardMarkdownView.vue'
 import CsvTableView from '../views/CsvTableView.vue'
@@ -17,7 +27,7 @@ export interface ToolDefinition {
   name: string
   path: string
   label: string
-  icon: string
+  icon: Component
   categoryId: string
   component: Component
 }
@@ -42,7 +52,7 @@ export const tools: ToolDefinition[] = [
     name: 'password-generator',
     path: '',
     label: '密碼產生器',
-    icon: '＊',
+    icon: KeyRoundIcon,
     categoryId: 'security',
     component: PasswordGeneratorView,
   },
@@ -50,7 +60,7 @@ export const tools: ToolDefinition[] = [
     name: 'base64',
     path: 'base64',
     label: 'Base64',
-    icon: '64',
+    icon: BinaryIcon,
     categoryId: 'encoding',
     component: Base64View,
   },
@@ -58,7 +68,7 @@ export const tools: ToolDefinition[] = [
     name: 'md5',
     path: 'md5',
     label: 'MD5',
-    icon: '#',
+    icon: HashIcon,
     categoryId: 'encoding',
     component: Md5View,
   },
@@ -66,7 +76,7 @@ export const tools: ToolDefinition[] = [
     name: 'json-editor',
     path: 'json-editor',
     label: 'JSON 編輯器',
-    icon: '{}',
+    icon: BracesIcon,
     categoryId: 'format',
     component: JsonEditorView,
   },
@@ -74,7 +84,7 @@ export const tools: ToolDefinition[] = [
     name: 'duplicate-items',
     path: 'duplicate-items',
     label: '去除重複項目',
-    icon: '1x',
+    icon: ListFilterIcon,
     categoryId: 'format',
     component: DuplicateItemsView,
   },
@@ -82,7 +92,7 @@ export const tools: ToolDefinition[] = [
     name: 'json-markdown-table',
     path: 'json-markdown-table',
     label: 'JSON 轉表格',
-    icon: '| |',
+    icon: TablePropertiesIcon,
     categoryId: 'format',
     component: JsonMarkdownTableView,
   },
@@ -90,7 +100,7 @@ export const tools: ToolDefinition[] = [
     name: 'csv-table',
     path: 'csv-table',
     label: 'CSV 表格檢視器',
-    icon: 'CSV',
+    icon: FileSpreadsheetIcon,
     categoryId: 'format',
     component: CsvTableView,
   },
@@ -98,7 +108,7 @@ export const tools: ToolDefinition[] = [
     name: 'clipboard-markdown',
     path: 'clipboard-markdown',
     label: '剪貼簿轉 Markdown',
-    icon: 'MD',
+    icon: ClipboardTypeIcon,
     categoryId: 'format',
     component: ClipboardMarkdownView,
   },

@@ -1,75 +1,47 @@
-﻿<script setup lang="ts" generic="T extends string">
+<script setup lang="ts" generic="T extends string">
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
+
 defineProps<{
   label: string
   options: Array<{ label: string; value: T }>
 }>()
 
 const model = defineModel<T>({ required: true })
+
+function updateModel(value: unknown) {
+  if (typeof value === 'string' && value) {
+    model.value = value as T
+  }
+}
 </script>
 
 <template>
-  <fieldset class="segmented-control">
-    <legend>{{ label }}</legend>
-    <div class="segmented-control__options" :style="{ '--segmented-control-option-count': options.length }">
-      <button
+  <fieldset class="grid gap-3">
+    <legend class="text-sm font-medium text-foreground">{{ label }}</legend>
+    <ToggleGroup
+      type="single"
+      variant="outline"
+      class="segmented-control__options w-full"
+      :model-value="model"
+      :style="{ '--segmented-option-count': options.length }"
+      @update:model-value="updateModel"
+    >
+      <ToggleGroupItem
         v-for="option in options"
         :key="option.value"
-        class="segmented-control__button"
-        :class="{ 'segmented-control__button--active': model === option.value }"
-        type="button"
-        @click="model = option.value"
+        class="h-10 w-full text-sm"
+        :value="option.value"
       >
         {{ option.label }}
-      </button>
-    </div>
+      </ToggleGroupItem>
+    </ToggleGroup>
   </fieldset>
 </template>
 
 <style scoped>
-.segmented-control {
-  display: grid;
-  gap: var(--space-3);
-  padding: 0;
-  border: 0;
-  margin: 0;
-}
-
-.segmented-control legend {
-  margin-bottom: var(--space-3);
-  color: var(--color-text-strong);
-  font-weight: 750;
-}
-
 .segmented-control__options {
   display: grid;
-  grid-template-columns: repeat(var(--segmented-control-option-count), minmax(0, 1fr));
-  gap: 4px;
-  padding: 4px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  background: var(--color-surface-muted);
-}
-
-.segmented-control__button {
-  min-height: 42px;
-  border: 0;
-  border-radius: var(--radius-md);
-  color: var(--color-text-muted);
-  background: transparent;
-  font: inherit;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.segmented-control__button--active {
-  color: var(--color-text-strong);
-  background: var(--color-surface);
-  box-shadow: var(--shadow-control);
-}
-
-.segmented-control__button:focus-visible {
-  outline: 2px solid var(--color-focus);
-  outline-offset: 2px;
+  grid-template-columns: repeat(var(--segmented-option-count), minmax(0, 1fr));
 }
 
 @media (max-width: 620px) {

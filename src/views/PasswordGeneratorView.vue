@@ -1,9 +1,16 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import RangeControl from '../components/forms/RangeControl.vue'
-import SegmentedControl from '../components/forms/SegmentedControl.vue'
-import SwitchControl from '../components/forms/SwitchControl.vue'
-import { usePasswordGenerator } from '../composables/usePasswordGenerator'
+import { CheckIcon, ChevronDownIcon, ClipboardIcon, PlusIcon, RefreshCwIcon, RotateCcwIcon } from '@lucide/vue'
+import RangeControl from '@/components/forms/RangeControl.vue'
+import SegmentedControl from '@/components/forms/SegmentedControl.vue'
+import SwitchControl from '@/components/forms/SwitchControl.vue'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Checkbox } from '@/components/ui/checkbox'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
+import { Input } from '@/components/ui/input'
+import { usePasswordGenerator } from '@/composables/usePasswordGenerator'
 
 const {
   addCustomSymbols,
@@ -56,12 +63,9 @@ async function fitPasswordToLine() {
 
   passwordFontSize.value = ''
   await nextTick()
-
   const availableWidth = element.clientWidth
 
-  if (!availableWidth) {
-    return
-  }
+  if (!availableWidth) return
 
   const computedStyle = window.getComputedStyle(element)
   const maxFontSize = Number.parseFloat(computedStyle.fontSize)
@@ -74,9 +78,7 @@ async function fitPasswordToLine() {
 
 function schedulePasswordFit() {
   window.cancelAnimationFrame(passwordFitFrame)
-  passwordFitFrame = window.requestAnimationFrame(() => {
-    void fitPasswordToLine()
-  })
+  passwordFitFrame = window.requestAnimationFrame(() => void fitPasswordToLine())
 }
 
 function addCustomSymbolOptions() {
@@ -90,7 +92,6 @@ function addCustomSymbolOptions() {
   const selectedCount = selectedSymbols.value.length
   const addedSymbols = addCustomSymbols(input)
   const selectedExistingSymbol = selectedSymbols.value.length > selectedCount
-
   customSymbolInput.value = ''
 
   if (addedSymbols.length) {
@@ -101,6 +102,14 @@ function addCustomSymbolOptions() {
   customSymbolFeedback.value = selectedExistingSymbol ? '已選取既有符號' : '沒有可加入的新符號'
 }
 
+function setSymbolSelected(symbol: string, checked: boolean | 'indeterminate') {
+  if (checked === true && !selectedSymbols.value.includes(symbol)) {
+    selectedSymbols.value = [...selectedSymbols.value, symbol]
+  } else if (checked !== true) {
+    selectedSymbols.value = selectedSymbols.value.filter((item) => item !== symbol)
+  }
+}
+
 function resetPasswordGeneratorSettings() {
   resetSettings()
   isSymbolPickerOpen.value = false
@@ -109,7 +118,6 @@ function resetPasswordGeneratorSettings() {
 }
 
 watch(displayPassword, schedulePasswordFit, { flush: 'post' })
-
 watch(isSymbolPickerOpen, (isOpen) => {
   try {
     window.localStorage.setItem(symbolPickerStorageKey, String(isOpen))
@@ -120,7 +128,6 @@ watch(isSymbolPickerOpen, (isOpen) => {
 
 onMounted(() => {
   schedulePasswordFit()
-
   if (passwordElement.value) {
     passwordResizeObserver = new ResizeObserver(schedulePasswordFit)
     passwordResizeObserver.observe(passwordElement.value)
@@ -134,464 +141,106 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <section class="tool-page">
-    <header class="tool-page__header">
-      <div class="tool-page__heading">
-        <div>
-          <h1>密碼產生器</h1>
-        </div>
-      </div>
+  <section class="mx-auto grid w-full max-w-5xl gap-5">
+    <header class="space-y-1">
+      <h1 class="text-2xl font-semibold tracking-tight sm:text-3xl">密碼產生器</h1>
+      <p class="text-sm text-muted-foreground">使用瀏覽器安全亂數產生密碼或 PIN，設定只保存在這台裝置。</p>
     </header>
 
-    <div class="generator">
-      <section class="generator__result" aria-label="產生的密碼">
-        <div class="generator__result-copy">
-          <p class="generator__label">產生結果</p>
+    <Card class="relative overflow-hidden bg-card">
+      <div class="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,var(--color-brand-glow),transparent_45%)]"></div>
+      <CardContent class="relative grid gap-5 px-4 py-2 sm:px-6 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
+        <div class="min-w-0">
+          <p class="mb-2 text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">產生結果</p>
           <p
             ref="passwordElement"
-            class="generator__password"
-            :class="{ 'generator__password--empty': !generatedPassword }"
-            :style="{ fontSize: passwordFontSize }"
+            class="max-w-full overflow-hidden whitespace-nowrap font-mono text-2xl font-semibold tracking-tight text-foreground sm:text-3xl"
+            :class="{ 'whitespace-normal text-base text-destructive': !generatedPassword }"
+            :style="{ '--password-min-font-size': '12px', fontSize: passwordFontSize }"
           >
             {{ displayPassword }}
           </p>
         </div>
 
-        <div class="generator__actions">
-          <span class="generator__strength" :data-strength="strength">{{ strengthLabel }}</span>
-          <button class="button button--ghost" type="button" @click="generatePassword">重新產生</button>
-          <button class="button button--primary" type="button" :disabled="!generatedPassword" @click="copyPassword">
+        <div class="flex flex-wrap items-center gap-2 md:justify-end">
+          <Badge :variant="strength === 'Strong' || strength === 'Excellent' ? 'secondary' : 'outline'">{{ strengthLabel }}</Badge>
+          <Button variant="outline" @click="generatePassword"><RefreshCwIcon />重新產生</Button>
+          <Button :disabled="!generatedPassword" @click="copyPassword">
+            <CheckIcon v-if="copyState === 'copied'" /><ClipboardIcon v-else />
             {{ copyState === 'copied' ? '已複製' : '複製' }}
-          </button>
+          </Button>
         </div>
 
-        <p v-if="copyState === 'failed'" class="generator__feedback">無法存取剪貼簿，請手動選取密碼複製。</p>
-      </section>
+        <p v-if="copyState === 'failed'" class="text-sm text-destructive md:col-span-2">無法存取剪貼簿，請手動選取密碼複製。</p>
+      </CardContent>
+    </Card>
 
-      <section class="generator__settings" aria-label="密碼設定">
-        <div class="generator__settings-actions">
-          <button class="button button--ghost" type="button" @click="resetPasswordGeneratorSettings">重置設定</button>
-        </div>
+    <Card aria-label="密碼設定">
+      <CardHeader class="flex-row items-center justify-between border-b px-4 pb-4 sm:px-6">
+        <div><CardTitle>產生設定</CardTitle><p class="mt-1 text-xs text-muted-foreground">調整類型、長度與使用字元</p></div>
+        <Button variant="ghost" size="sm" @click="resetPasswordGeneratorSettings"><RotateCcwIcon />重置</Button>
+      </CardHeader>
 
+      <CardContent class="grid gap-6 px-4 sm:px-6">
         <SegmentedControl v-model="mode" label="密碼類型" :options="modeOptions" />
-        <div v-if="mode === 'random'" class="generator__panel">
+
+        <div v-if="mode === 'random'" class="grid gap-6">
           <RangeControl v-model="randomLength" label="長度" :min="8" :max="64" suffix=" 字元" />
 
-          <div class="generator__grid">
+          <div class="grid gap-3 sm:grid-cols-2">
             <SwitchControl v-model="includeUppercase" label="大寫字母" />
             <SwitchControl v-model="includeLowercase" label="小寫字母" />
             <SwitchControl v-model="includeNumbers" label="數字" />
-            <SwitchControl
-              v-model="includeSymbols"
-              label="符號"
-              :description="selectedSymbols.length ? `已選 ${selectedSymbols.length} 個` : '未選擇符號'"
-            />
+            <SwitchControl v-model="includeSymbols" label="符號" :description="selectedSymbols.length ? `已選 ${selectedSymbols.length} 個` : '未選擇符號'" />
           </div>
 
-          <fieldset v-if="includeSymbols" class="symbol-picker">
-            <legend>符號選擇</legend>
-            <button
-              class="symbol-picker__toggle"
-              type="button"
-              :aria-expanded="isSymbolPickerOpen"
-              @click="isSymbolPickerOpen = !isSymbolPickerOpen"
-            >
-              <span>自訂符號</span>
-              <span>{{ selectedSymbols.length ? `已選 ${selectedSymbols.length} 個` : '未選擇符號' }}</span>
-              <span aria-hidden="true">{{ isSymbolPickerOpen ? '收合' : '展開' }}</span>
-            </button>
+          <Collapsible v-if="includeSymbols" v-model:open="isSymbolPickerOpen" class="rounded-xl border bg-muted/20">
+            <CollapsibleTrigger as-child>
+              <Button variant="ghost" class="h-12 w-full justify-between rounded-xl px-4">
+                <span>自訂符號</span>
+                <span class="ml-auto text-xs text-muted-foreground">{{ selectedSymbols.length ? `已選 ${selectedSymbols.length} 個` : '未選擇符號' }}</span>
+                <ChevronDownIcon class="transition-transform" :class="{ 'rotate-180': isSymbolPickerOpen }" />
+              </Button>
+            </CollapsibleTrigger>
 
-            <div v-if="isSymbolPickerOpen" class="symbol-picker__content">
-              <div class="symbol-picker__actions">
-                <button class="symbol-picker__action" type="button" @click="selectAllSymbols">全選</button>
-                <button class="symbol-picker__action" type="button" @click="clearSymbols">清除</button>
+            <CollapsibleContent class="grid gap-4 border-t p-4">
+              <div class="flex gap-2">
+                <Button variant="outline" size="sm" @click="selectAllSymbols">全選</Button>
+                <Button variant="outline" size="sm" @click="clearSymbols">清除</Button>
               </div>
 
-              <form class="symbol-picker__custom" @submit.prevent="addCustomSymbolOptions">
-                <label class="symbol-picker__custom-label" for="custom-symbol-input">加入符號</label>
-                <div class="symbol-picker__custom-row">
-                  <input
-                    id="custom-symbol-input"
-                    v-model="customSymbolInput"
-                    class="symbol-picker__custom-input"
-                    type="text"
-                    inputmode="text"
-                    autocomplete="off"
-                    spellcheck="false"
-                    maxlength="32"
-                    placeholder="例如 & / \\ |"
-                  />
-                  <button class="symbol-picker__action" type="submit">加入</button>
+              <form class="grid gap-2" @submit.prevent="addCustomSymbolOptions">
+                <label class="text-sm font-medium" for="custom-symbol-input">加入符號</label>
+                <div class="flex gap-2">
+                  <Input id="custom-symbol-input" v-model="customSymbolInput" class="font-mono" type="text" inputmode="text" autocomplete="off" spellcheck="false" maxlength="32" placeholder="例如 & / \ |" />
+                  <Button type="submit" variant="outline"><PlusIcon />加入</Button>
                 </div>
-                <p v-if="customSymbolFeedback" class="symbol-picker__feedback">{{ customSymbolFeedback }}</p>
+                <p v-if="customSymbolFeedback" class="text-xs text-muted-foreground">{{ customSymbolFeedback }}</p>
               </form>
 
-              <div class="symbol-picker__options">
+              <div class="grid grid-cols-[repeat(auto-fit,minmax(42px,1fr))] gap-2">
                 <label
                   v-for="symbol in symbolOptions"
                   :key="symbol"
-                  class="symbol-picker__option"
-                  :class="{ 'symbol-picker__option--active': selectedSymbols.includes(symbol) }"
+                  class="flex min-h-10 items-center justify-center gap-2 rounded-lg border bg-background px-2 font-mono text-sm transition-colors hover:bg-muted"
+                  :class="{ 'border-primary bg-accent text-accent-foreground': selectedSymbols.includes(symbol) }"
                 >
-                  <input v-model="selectedSymbols" type="checkbox" :value="symbol" />
-                  <span>{{ symbol }}</span>
+                  <Checkbox
+                    class="sr-only"
+                    :model-value="selectedSymbols.includes(symbol)"
+                    @update:model-value="setSymbolSelected(symbol, $event)"
+                  />
+                  {{ symbol }}
                 </label>
               </div>
-            </div>
-          </fieldset>
+            </CollapsibleContent>
+          </Collapsible>
         </div>
 
-        <div v-else class="generator__panel">
+        <div v-else>
           <RangeControl v-model="pinLength" label="PIN 長度" :min="4" :max="12" suffix=" 位" />
         </div>
-      </section>
-    </div>
+      </CardContent>
+    </Card>
   </section>
 </template>
-
-<style scoped>
-.tool-page {
-  display: grid;
-  gap: var(--space-6);
-  max-width: 1040px;
-  margin: 0 auto;
-}
-
-.tool-page__header {
-  display: grid;
-  gap: var(--space-3);
-}
-
-.tool-page__heading h1 {
-  margin: 0 0 var(--space-3);
-  color: var(--color-text-strong);
-  font-size: clamp(2rem, 4vw, 3.6rem);
-  line-height: 1;
-  letter-spacing: 0;
-}
-
-.generator {
-  display: grid;
-  gap: var(--space-5);
-}
-
-.generator__result,
-.generator__settings {
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-xl);
-  background: var(--color-surface);
-  box-shadow: var(--shadow-panel);
-}
-
-.generator__result {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: var(--space-5);
-  align-items: center;
-  padding: var(--space-6);
-}
-
-.generator__label {
-  margin: 0 0 var(--space-2);
-  color: var(--color-text-soft);
-  font-size: 0.78rem;
-  font-weight: 850;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.generator__result-copy {
-  min-width: 0;
-}
-
-.generator__password {
-  --password-min-font-size: 0.25rem;
-
-  margin: 0;
-  max-width: 100%;
-  overflow: hidden;
-  color: var(--color-text-strong);
-  font-family: var(--font-mono);
-  font-size: clamp(1.4rem, 3vw, 2.35rem);
-  line-height: 1.18;
-  text-overflow: clip;
-  white-space: nowrap;
-}
-
-.generator__password--empty {
-  overflow-wrap: anywhere;
-  color: var(--color-danger);
-  font-family: inherit;
-  font-size: 1rem;
-  white-space: normal;
-}
-
-.generator__actions {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-}
-
-.generator__strength {
-  min-width: 58px;
-  padding: 7px 10px;
-  border-radius: var(--radius-sm);
-  color: var(--color-text-strong);
-  background: var(--color-surface-muted);
-  font-size: 0.85rem;
-  font-weight: 800;
-  text-align: center;
-}
-
-.generator__strength[data-strength='Strong'],
-.generator__strength[data-strength='Excellent'] {
-  color: var(--color-success-strong);
-  background: var(--color-success-soft);
-}
-
-.generator__feedback {
-  grid-column: 1 / -1;
-  margin: 0;
-  color: var(--color-danger);
-}
-
-.generator__settings {
-  display: grid;
-  gap: var(--space-6);
-  padding: var(--space-6);
-}
-
-.generator__settings-actions {
-  display: flex;
-  justify-content: flex-end;
-}
-
-.generator__panel {
-  display: grid;
-  gap: var(--space-5);
-}
-
-.generator__grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-3);
-}
-
-.symbol-picker {
-  display: grid;
-  gap: var(--space-3);
-  padding: 0;
-  border: 0;
-  margin: 0;
-}
-
-.symbol-picker legend {
-  margin-bottom: var(--space-3);
-  color: var(--color-text-strong);
-  font-weight: 750;
-}
-
-.symbol-picker__toggle {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-  min-height: 44px;
-  padding: 0 var(--space-3);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  color: var(--color-text-strong);
-  background: var(--color-surface);
-  font: inherit;
-  font-weight: 750;
-  cursor: pointer;
-}
-
-.symbol-picker__toggle span:nth-child(2),
-.symbol-picker__toggle span:nth-child(3) {
-  color: var(--color-text-muted);
-  font-size: 0.9rem;
-  font-weight: 700;
-}
-
-.symbol-picker__content {
-  display: grid;
-  gap: var(--space-3);
-}
-
-.symbol-picker__actions {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-2);
-}
-
-.symbol-picker__action {
-  min-height: 34px;
-  padding: 0 var(--space-3);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  color: var(--color-text-strong);
-  background: var(--color-surface);
-  font: inherit;
-  font-size: 0.9rem;
-  font-weight: 750;
-  cursor: pointer;
-}
-
-.symbol-picker__custom {
-  display: grid;
-  gap: var(--space-3);
-}
-
-.symbol-picker__custom-label {
-  color: var(--color-text-strong);
-  font-weight: 750;
-}
-
-.symbol-picker__custom-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: var(--space-2);
-}
-
-.symbol-picker__custom-input {
-  min-width: 0;
-  min-height: 34px;
-  padding: 0 var(--space-3);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  color: var(--color-text-strong);
-  background: var(--color-surface);
-  font: inherit;
-  font-family: var(--font-mono);
-  font-weight: 750;
-}
-
-.symbol-picker__feedback {
-  margin: 0;
-  color: var(--color-text-muted);
-  font-size: 0.85rem;
-  font-weight: 700;
-}
-
-.symbol-picker__options {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(42px, 1fr));
-  gap: var(--space-2);
-}
-
-.symbol-picker__option {
-  display: grid;
-  place-items: center;
-  min-height: 42px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  color: var(--color-text-muted);
-  background: var(--color-surface);
-  font-family: var(--font-mono);
-  font-weight: 800;
-  cursor: pointer;
-  transition:
-    border-color 0.18s ease,
-    color 0.18s ease,
-    background 0.18s ease;
-}
-
-.symbol-picker__option--active {
-  border-color: var(--color-primary);
-  color: var(--color-primary-strong);
-  background: var(--color-primary-soft);
-}
-
-.symbol-picker__option input {
-  position: absolute;
-  opacity: 0;
-  pointer-events: none;
-}
-
-.symbol-picker__action:focus-visible,
-.symbol-picker__custom-input:focus-visible,
-.symbol-picker__toggle:focus-visible,
-.symbol-picker__option:focus-within {
-  outline: 2px solid var(--color-focus);
-  outline-offset: 2px;
-}
-
-.button {
-  min-height: 42px;
-  padding: 0 var(--space-4);
-  border: 1px solid transparent;
-  border-radius: var(--radius-md);
-  font: inherit;
-  font-weight: 800;
-  cursor: pointer;
-}
-
-.button--primary {
-  color: var(--color-on-primary);
-  background: var(--color-primary);
-}
-
-.button--primary:hover:not(:disabled) {
-  background: var(--color-primary-hover);
-}
-
-.button--ghost {
-  color: var(--color-text-strong);
-  border-color: var(--color-border);
-  background: var(--color-surface-muted);
-}
-
-.button:disabled {
-  cursor: not-allowed;
-  opacity: 0.5;
-}
-
-.button:focus-visible {
-  outline: 2px solid var(--color-focus);
-  outline-offset: 2px;
-}
-
-@media (max-width: 760px) {
-  .generator__result {
-    grid-template-columns: 1fr;
-    padding: var(--space-4);
-  }
-
-  .generator__actions {
-    flex-wrap: wrap;
-  }
-
-  .generator__settings {
-    padding: var(--space-4);
-  }
-
-  .generator__grid {
-    grid-template-columns: 1fr;
-  }
-
-  .symbol-picker__toggle {
-    align-items: flex-start;
-    flex-direction: column;
-    padding: var(--space-3);
-  }
-
-  .symbol-picker__action {
-    flex: 1;
-  }
-
-  .generator__settings-actions,
-  .symbol-picker__actions {
-    grid-template-columns: 1fr;
-  }
-
-  .generator__settings-actions {
-    display: grid;
-  }
-
-  .symbol-picker__custom-row {
-    display: grid;
-    grid-template-columns: 1fr;
-  }
-}
-</style>

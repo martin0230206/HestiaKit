@@ -1,11 +1,16 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 import { computed } from 'vue'
+import { ChevronDownIcon, ChevronRightIcon, PlusIcon, Trash2Icon } from '@lucide/vue'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import {
   getJsonValueKind,
   parseJsonEditableValue,
   toJsonTreeChildPath,
   type JsonValueKind,
-} from '../../utils/jsonEditor'
+} from '@/utils/jsonEditor'
 
 defineOptions({
   name: 'JsonTreeNode',
@@ -53,6 +58,7 @@ const canAddItem = computed(() => Array.isArray(props.value) || (props.value !==
 const canDeleteItem = computed(() => props.path !== '$')
 const editableValueText = computed(() => String(props.value))
 const summary = computed(() => getSummary(props.value, kind.value, childEntries.value.length))
+const keyCellStyle = computed(() => ({ paddingInlineStart: `${(props.depth ?? 0) * 20 + 8}px` }))
 
 function getSummary(value: unknown, valueKind: JsonValueKind, childCount: number) {
   if (valueKind === 'array') {
@@ -98,74 +104,73 @@ function commitValue(event: Event) {
 </script>
 
 <template>
-  <div class="json-tree-node" :style="{ '--tree-depth': depth ?? 0 }">
-    <div class="json-tree-node__row" :data-kind="kind" :data-path="path">
-      <button
-        v-if="isExpandable"
-        class="json-tree-node__toggle"
-        type="button"
-        :aria-label="isExpanded ? '收合節點' : '展開節點'"
-        :title="isExpanded ? '收合' : '展開'"
-        @click="togglePath(path)"
-      >
-        {{ isExpanded ? '▾' : '▸' }}
-      </button>
-      <span v-else class="json-tree-node__spacer" aria-hidden="true"></span>
-
-      <input
-        v-if="canEditKey"
-        class="json-tree-node__key-input"
-        type="text"
-        :value="keyLabel"
-        aria-label="編輯 key"
-        spellcheck="false"
-        autocomplete="off"
-        @change="commitKey"
-        @keydown.enter.prevent="commitKey"
-      />
-      <span v-else class="json-tree-node__key">{{ keyLabel }}</span>
-      <span class="json-tree-node__type">{{ kind }}</span>
-      <textarea
-        v-if="canEditValue"
-        class="json-tree-node__value-input"
-        :value="editableValueText"
-        rows="1"
-        aria-label="編輯 value"
-        spellcheck="false"
-        autocomplete="off"
-        wrap="soft"
-        @change="commitValue"
-        @keydown.enter.prevent="commitValue"
-      ></textarea>
-      <span v-else class="json-tree-node__summary">{{ summary }}</span>
-
-      <span class="json-tree-node__actions">
-        <button
-          v-if="canAddItem"
-          class="json-tree-node__action"
-          type="button"
-          aria-label="新增項目"
-          title="新增項目"
-          @click="addItem(path)"
+  <div>
+    <div
+      class="grid min-w-[46rem] grid-cols-[minmax(13rem,0.9fr)_6rem_minmax(16rem,1.2fr)_5rem] items-center border-b text-sm last:border-b-0 hover:bg-muted/30"
+      :data-kind="kind"
+      :data-path="path"
+    >
+      <div class="flex min-w-0 items-center gap-1.5 py-2 pr-2" :style="keyCellStyle">
+        <Button
+          v-if="isExpandable"
+          variant="ghost"
+          size="icon-xs"
+          :aria-label="isExpanded ? '收合節點' : '展開節點'"
+          :title="isExpanded ? '收合' : '展開'"
+          @click="togglePath(path)"
         >
-          +
-        </button>
-        <span v-else class="json-tree-node__action-spacer" aria-hidden="true"></span>
-        <button
-          v-if="canDeleteItem"
-          class="json-tree-node__action json-tree-node__action--danger"
-          type="button"
-          aria-label="刪除項目"
-          title="刪除項目"
-          @click="deleteItem(path)"
-        >
-          ×
-        </button>
-        <span v-else class="json-tree-node__action-spacer" aria-hidden="true"></span>
-      </span>
+          <ChevronDownIcon v-if="isExpanded" />
+          <ChevronRightIcon v-else />
+        </Button>
+        <span v-else class="size-6 shrink-0" aria-hidden="true" />
+
+        <Input
+          v-if="canEditKey"
+          class="h-7 font-mono"
+          type="text"
+          :model-value="keyLabel"
+          aria-label="編輯 key"
+          spellcheck="false"
+          autocomplete="off"
+          @change="commitKey"
+          @keydown.enter.prevent="commitKey"
+        />
+        <code v-else class="min-w-0 truncate font-mono font-medium text-foreground">{{ keyLabel }}</code>
+      </div>
+
+      <div class="px-2 py-2">
+        <Badge variant="outline" class="font-mono text-[0.7rem]">{{ kind }}</Badge>
+      </div>
+
+      <div class="min-w-0 px-2 py-2">
+        <Textarea
+          v-if="canEditValue"
+          class="min-h-7 field-sizing-fixed resize-y py-1 font-mono text-xs leading-5"
+          :model-value="editableValueText"
+          rows="1"
+          aria-label="編輯 value"
+          spellcheck="false"
+          autocomplete="off"
+          wrap="soft"
+          @change="commitValue"
+          @keydown.enter.prevent="commitValue"
+        />
+        <code v-else class="block truncate font-mono text-xs text-muted-foreground" :title="summary">{{ summary }}</code>
+      </div>
+
+      <div class="flex items-center justify-end gap-1 px-2 py-2">
+        <Button v-if="canAddItem" variant="ghost" size="icon-xs" aria-label="新增項目" title="新增項目" @click="addItem(path)">
+          <PlusIcon />
+        </Button>
+        <span v-else class="size-6" aria-hidden="true" />
+        <Button v-if="canDeleteItem" variant="destructive" size="icon-xs" aria-label="刪除項目" title="刪除項目" @click="deleteItem(path)">
+          <Trash2Icon />
+        </Button>
+        <span v-else class="size-6" aria-hidden="true" />
+      </div>
     </div>
 
-    <div v-if="isExpandable && isExpanded" class="json-tree-node__children">
+    <div v-if="isExpandable && isExpanded">
       <JsonTreeNode
         v-for="entry in childEntries"
         :key="entry.path"
@@ -183,171 +188,3 @@ function commitValue(event: Event) {
     </div>
   </div>
 </template>
-
-<style scoped>
-.json-tree-node {
-  display: grid;
-}
-
-.json-tree-node__row {
-  display: grid;
-  grid-template-columns: 28px minmax(220px, 0.9fr) minmax(76px, 0.35fr) minmax(160px, 1.25fr) 62px;
-  align-items: center;
-  gap: var(--space-2);
-  width: 100%;
-  min-width: 760px;
-  min-height: 34px;
-  padding: 0 var(--space-3) 0 calc(var(--space-3) + var(--tree-depth) * 22px);
-  border-bottom: 1px solid var(--color-border);
-  color: var(--color-text);
-  font-family: var(--font-sans);
-  font-size: 0.9rem;
-}
-
-.json-tree-node__row[data-kind='object'],
-.json-tree-node__row[data-kind='array'] {
-  background: var(--color-surface-muted);
-}
-
-.json-tree-node__toggle {
-  display: grid;
-  width: 24px;
-  height: 24px;
-  place-items: center;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  color: var(--color-primary-strong);
-  background: var(--color-surface);
-  font: inherit;
-  font-weight: 900;
-  cursor: pointer;
-}
-
-.json-tree-node__toggle:focus-visible {
-  outline: 2px solid var(--color-focus);
-  outline-offset: 2px;
-}
-
-.json-tree-node__spacer {
-  width: 24px;
-  height: 24px;
-}
-
-.json-tree-node__key,
-.json-tree-node__key-input {
-  min-width: 0;
-  color: var(--color-text-strong);
-  font-weight: 800;
-  line-height: 1.35;
-}
-
-.json-tree-node__key {
-  overflow-wrap: anywhere;
-  white-space: normal;
-}
-
-.json-tree-node__type {
-  color: var(--color-text-soft);
-  font-size: 0.78rem;
-  font-weight: 800;
-  text-transform: uppercase;
-}
-
-.json-tree-node__summary,
-.json-tree-node__value-input {
-  min-width: 0;
-  color: var(--color-text-muted);
-  overflow-wrap: anywhere;
-  white-space: pre-wrap;
-}
-
-.json-tree-node__key-input,
-.json-tree-node__value-input {
-  width: 100%;
-  padding: 0 var(--space-2);
-  border: 1px solid transparent;
-  border-radius: var(--radius-sm);
-  background: transparent;
-  font: inherit;
-}
-
-.json-tree-node__key-input {
-  height: 26px;
-  color: var(--color-text-strong);
-  font-weight: 800;
-}
-
-.json-tree-node__value-input {
-  min-height: 26px;
-  field-sizing: content;
-  overflow: hidden;
-  resize: none;
-  color: var(--color-text-muted);
-  font-family: var(--font-mono);
-  line-height: 1.45;
-}
-
-.json-tree-node__key-input:hover,
-.json-tree-node__value-input:hover {
-  border-color: var(--color-border);
-  background: var(--color-surface);
-}
-
-.json-tree-node__key-input:focus,
-.json-tree-node__value-input:focus {
-  border-color: var(--color-focus);
-  background: var(--color-surface);
-  outline: none;
-  box-shadow: 0 0 0 1px var(--color-focus);
-}
-
-.json-tree-node__actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 3px;
-  min-width: 0;
-}
-
-.json-tree-node__action,
-.json-tree-node__action-spacer {
-  width: 26px;
-  height: 26px;
-}
-
-.json-tree-node__action {
-  display: grid;
-  place-items: center;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  color: var(--color-primary-strong);
-  background: var(--color-surface);
-  font: inherit;
-  font-family: var(--font-mono);
-  font-weight: 900;
-  cursor: pointer;
-}
-
-.json-tree-node__action:hover {
-  border-color: var(--color-primary);
-  background: var(--color-primary-soft);
-}
-
-.json-tree-node__action--danger {
-  color: var(--color-danger);
-}
-
-.json-tree-node__action:focus-visible {
-  outline: 2px solid var(--color-focus);
-  outline-offset: 2px;
-}
-
-@media (max-width: 720px) {
-  .json-tree-node__row {
-    grid-template-columns: 28px minmax(220px, 1fr) minmax(160px, 1fr) 62px;
-  }
-
-  .json-tree-node__type {
-    display: none;
-  }
-}
-</style>

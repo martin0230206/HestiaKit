@@ -1,7 +1,29 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 import { ref } from 'vue'
-import JsonTreeNode from '../components/json-editor/JsonTreeNode.vue'
-import { useJsonEditor } from '../composables/useJsonEditor'
+import {
+  ArrowDownAZIcon,
+  BracesIcon,
+  CheckIcon,
+  ClipboardIcon,
+  DownloadIcon,
+  FileTextIcon,
+  FoldVerticalIcon,
+  Minimize2Icon,
+  SparklesIcon,
+  Trash2Icon,
+  UnfoldVerticalIcon,
+  UploadIcon,
+  WandSparklesIcon,
+} from '@lucide/vue'
+import JsonTreeNode from '@/components/json-editor/JsonTreeNode.vue'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { ButtonGroup } from '@/components/ui/button-group'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area'
+import { Textarea } from '@/components/ui/textarea'
+import { useJsonEditor } from '@/composables/useJsonEditor'
 
 const {
   addTreeItem,
@@ -56,711 +78,173 @@ function handleFileChange(event: Event) {
 </script>
 
 <template>
-  <section class="json-page">
-    <header class="json-page__header">
-      <h1>JSON 編輯器</h1>
+  <section class="mx-auto grid w-full max-w-7xl gap-5">
+    <header class="space-y-1">
+      <h1 class="text-2xl font-semibold tracking-tight">JSON 編輯器</h1>
+      <p class="text-sm text-muted-foreground">格式化、修復與樹狀編輯全都在瀏覽器內完成。</p>
     </header>
 
-    <section class="json-workbench" aria-label="JSON 編輯器">
-      <div class="json-toolbar" aria-label="JSON 操作">
-        <div class="json-toolbar__group" aria-label="檢視模式">
-          <button
-            class="icon-button"
-            :class="{ 'icon-button--active': viewMode === 'text' }"
-            type="button"
-            aria-label="文字模式"
-            title="文字模式"
-            @click="setViewMode('text')"
-          >
-            <span aria-hidden="true">T</span>
-          </button>
-          <button
-            class="icon-button"
-            :class="{ 'icon-button--active': viewMode === 'tree' }"
-            type="button"
-            aria-label="樹狀模式"
-            title="樹狀模式"
-            @click="setViewMode('tree')"
-          >
-            <span aria-hidden="true">{}</span>
-          </button>
-        </div>
+    <Card>
+      <CardContent class="flex flex-wrap items-center gap-2 px-4 sm:px-5">
+        <ButtonGroup aria-label="檢視模式">
+          <Button :variant="viewMode === 'text' ? 'default' : 'outline'" @click="setViewMode('text')">
+            <FileTextIcon data-icon="inline-start" />
+            文字
+          </Button>
+          <Button :variant="viewMode === 'tree' ? 'default' : 'outline'" @click="setViewMode('tree')">
+            <BracesIcon data-icon="inline-start" />
+            樹狀
+          </Button>
+        </ButtonGroup>
 
-        <div class="json-toolbar__group" aria-label="文件操作">
-          <button class="icon-button" type="button" aria-label="載入範例" title="載入範例" @click="loadSample">
-            <span class="sample-document-icon" aria-hidden="true">
-              <span class="sample-document-icon__line"></span>
-            </span>
-          </button>
-          <button class="icon-button" type="button" aria-label="開啟檔案" title="開啟檔案" @click="openFilePicker">
-            <span class="file-transfer-icon file-transfer-icon--upload" aria-hidden="true">
-              <span class="file-transfer-icon__arrow"></span>
-            </span>
-          </button>
-          <button class="icon-button" type="button" aria-label="下載 JSON" title="下載 JSON" :disabled="!source" @click="downloadJson">
-            <span class="file-transfer-icon file-transfer-icon--download" aria-hidden="true">
-              <span class="file-transfer-icon__arrow"></span>
-            </span>
-          </button>
-          <button class="icon-button icon-button--danger" type="button" aria-label="清空" title="清空" :disabled="!source" @click="clearJson">
-            <span aria-hidden="true">×</span>
-          </button>
-        </div>
+        <span class="hidden h-6 w-px bg-border sm:block" aria-hidden="true" />
 
-        <div class="json-toolbar__group" aria-label="內容處理">
-          <button class="icon-button" type="button" aria-label="格式化" title="格式化" :disabled="!source" @click="formatJson">
-            <span aria-hidden="true">↧</span>
-          </button>
-          <button class="icon-button" type="button" aria-label="壓縮" title="壓縮" :disabled="!source" @click="compactJson">
-            <span aria-hidden="true">⇥</span>
-          </button>
-          <button class="icon-button" type="button" aria-label="排序 key" title="排序 key" :disabled="!source" @click="sortKeys">
-            <span aria-hidden="true">A↓</span>
-          </button>
-          <button class="icon-button" type="button" aria-label="複製" :title="copyState === 'copied' ? '已複製' : '複製'" :disabled="!source" @click="copyJson">
-            <span aria-hidden="true">{{ copyState === 'copied' ? '✓' : '⧉' }}</span>
-          </button>
-        </div>
+        <Button variant="outline" title="載入範例" @click="loadSample">
+          <SparklesIcon data-icon="inline-start" />
+          範例
+        </Button>
+        <Button variant="outline" title="開啟 JSON 檔案" @click="openFilePicker">
+          <UploadIcon data-icon="inline-start" />
+          開啟
+        </Button>
+        <Button variant="outline" title="下載 JSON" :disabled="!source" @click="downloadJson">
+          <DownloadIcon data-icon="inline-start" />
+          下載
+        </Button>
+        <Button variant="destructive" title="清空" :disabled="!source" @click="clearJson">
+          <Trash2Icon data-icon="inline-start" />
+          清空
+        </Button>
 
-        <div class="json-toolbar__group" aria-label="樹狀操作">
-          <button class="icon-button" type="button" aria-label="展開全部" title="展開全部" :disabled="viewMode !== 'tree' || !isValid" @click="expandTree">
-            <span class="tree-action-icon tree-action-icon--expand" aria-hidden="true">
-              <span class="tree-action-icon__chevron tree-action-icon__chevron--up"></span>
-              <span class="tree-action-icon__chevron tree-action-icon__chevron--down"></span>
-            </span>
-          </button>
-          <button class="icon-button" type="button" aria-label="收合全部" title="收合全部" :disabled="viewMode !== 'tree' || !isValid" @click="collapseTree">
-            <span class="tree-action-icon tree-action-icon--collapse" aria-hidden="true">
-              <span class="tree-action-icon__chevron tree-action-icon__chevron--down"></span>
-              <span class="tree-action-icon__chevron tree-action-icon__chevron--up"></span>
-            </span>
-          </button>
-        </div>
+        <input ref="fileInput" class="sr-only" type="file" accept=".json,application/json,text/json" @change="handleFileChange" />
 
-        <input
-          ref="fileInput"
-          class="json-toolbar__file"
-          type="file"
-          accept=".json,application/json,text/json"
-          @change="handleFileChange"
-        />
-      </div>
+        <span class="hidden h-6 w-px bg-border lg:block" aria-hidden="true" />
 
-      <div class="json-editor">
-        <div class="json-editor__main">
-          <label v-if="viewMode === 'text'" class="json-editor__field">
-            <span class="json-editor__label">內容</span>
-            <textarea
-              v-model="source"
-              class="json-editor__textarea"
-              spellcheck="false"
-              autocomplete="off"
-              autocapitalize="off"
-              aria-label="JSON 內容"
-            ></textarea>
-          </label>
+        <Button variant="outline" title="格式化" :disabled="!source" @click="formatJson">
+          <WandSparklesIcon data-icon="inline-start" />
+          格式化
+        </Button>
+        <Button variant="outline" title="壓縮" :disabled="!source" @click="compactJson">
+          <Minimize2Icon data-icon="inline-start" />
+          壓縮
+        </Button>
+        <Button variant="outline" title="排序 key" :disabled="!source" @click="sortKeys">
+          <ArrowDownAZIcon data-icon="inline-start" />
+          排序
+        </Button>
+        <Button :disabled="!source" @click="copyJson">
+          <CheckIcon v-if="copyState === 'copied'" data-icon="inline-start" />
+          <ClipboardIcon v-else data-icon="inline-start" />
+          {{ copyState === 'copied' ? '已複製' : '複製' }}
+        </Button>
 
-          <div v-else class="json-tree" aria-label="JSON 樹狀內容">
-            <div class="json-tree__header" aria-hidden="true">
-              <span></span>
-              <span>key</span>
-              <span>type</span>
-              <span>value</span>
-              <span>actions</span>
+        <ButtonGroup v-if="viewMode === 'tree'" class="ml-auto" aria-label="樹狀操作">
+          <Button variant="outline" :disabled="!isValid" @click="expandTree">
+            <UnfoldVerticalIcon data-icon="inline-start" />
+            展開
+          </Button>
+          <Button variant="outline" :disabled="!isValid" @click="collapseTree">
+            <FoldVerticalIcon data-icon="inline-start" />
+            收合
+          </Button>
+        </ButtonGroup>
+      </CardContent>
+    </Card>
+
+    <div class="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1fr)_19rem]">
+      <Card class="min-w-0 overflow-hidden">
+        <CardHeader class="flex-row items-start justify-between gap-3 border-b px-4 pb-4 sm:px-5">
+          <div class="space-y-1.5">
+            <CardTitle>{{ viewMode === 'text' ? 'JSON 內容' : '樹狀內容' }}</CardTitle>
+            <CardDescription>{{ viewMode === 'text' ? '直接編輯原始 JSON。' : '點選 key 或 value 即可修改。' }}</CardDescription>
+          </div>
+          <Badge :variant="isValid ? 'default' : 'destructive'">{{ statusLabel }}</Badge>
+        </CardHeader>
+
+        <CardContent v-if="viewMode === 'text'" class="px-4 sm:px-5">
+          <Textarea
+            v-model="source"
+            class="min-h-[38rem] resize-y field-sizing-fixed font-mono leading-relaxed"
+            spellcheck="false"
+            autocomplete="off"
+            autocapitalize="off"
+            aria-label="JSON 內容"
+          />
+        </CardContent>
+
+        <CardContent v-else class="p-0">
+          <ScrollArea class="h-[42rem] w-full">
+            <div class="min-w-[46rem]">
+              <div class="grid grid-cols-[minmax(13rem,0.9fr)_6rem_minmax(16rem,1.2fr)_5rem] border-b bg-muted/50 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                <span class="px-3 py-2.5">key</span>
+                <span class="px-2 py-2.5">type</span>
+                <span class="px-2 py-2.5">value</span>
+                <span class="px-2 py-2.5 text-right">操作</span>
+              </div>
+
+              <JsonTreeNode
+                v-if="isValid"
+                :value="treeValue"
+                path="$"
+                :expanded-paths="expandedPaths"
+                :add-item="addTreeItem"
+                :delete-item="deleteTreeItem"
+                :toggle-path="toggleTreePath"
+                :update-key="updateTreeKey"
+                :update-value="updateTreeValue"
+              />
+
+              <div v-else class="grid min-h-96 place-items-center p-8 text-center">
+                <div class="space-y-2">
+                  <p class="font-medium text-destructive">JSON 格式錯誤</p>
+                  <p class="text-sm text-muted-foreground">{{ issueLocation || issue?.message || '請先修正內容。' }}</p>
+                </div>
+              </div>
+            </div>
+            <ScrollBar orientation="horizontal" />
+          </ScrollArea>
+        </CardContent>
+      </Card>
+
+      <aside class="grid content-start gap-5" aria-label="JSON 狀態">
+        <Card>
+          <CardHeader class="border-b px-4 pb-4">
+            <CardTitle>文件摘要</CardTitle>
+          </CardHeader>
+          <CardContent class="grid gap-4 px-4">
+            <dl class="grid grid-cols-2 gap-3 text-sm">
+              <div class="rounded-lg bg-muted/50 p-3"><dt class="text-muted-foreground">行數</dt><dd class="mt-1 font-mono text-base font-semibold">{{ stats.lines }}</dd></div>
+              <div class="rounded-lg bg-muted/50 p-3"><dt class="text-muted-foreground">字元</dt><dd class="mt-1 font-mono text-base font-semibold">{{ stats.characters }}</dd></div>
+            </dl>
+
+            <Alert v-if="issue" variant="destructive">
+              <BracesIcon />
+              <AlertTitle>{{ issueLocation || '解析失敗' }}</AlertTitle>
+              <AlertDescription>{{ issue.message }}</AlertDescription>
+            </Alert>
+
+            <div v-if="canRepair" class="grid gap-3 rounded-lg border border-primary/30 bg-primary/5 p-3">
+              <div>
+                <p class="text-sm font-medium">偵測到可修復項目</p>
+                <ul class="mt-2 grid gap-1 text-xs text-muted-foreground">
+                  <li v-for="action in repairActions" :key="action.kind" class="flex justify-between gap-3">
+                    <span>{{ action.label }}</span>
+                    <span>{{ action.count }} 處</span>
+                  </li>
+                </ul>
+              </div>
+              <Button @click="repairJson">
+                <WandSparklesIcon data-icon="inline-start" />
+                自動修復
+              </Button>
             </div>
 
-            <JsonTreeNode
-              v-if="isValid"
-              :value="treeValue"
-              path="$"
-              :expanded-paths="expandedPaths"
-              :add-item="addTreeItem"
-              :delete-item="deleteTreeItem"
-              :toggle-path="toggleTreePath"
-              :update-key="updateTreeKey"
-              :update-value="updateTreeValue"
-            />
-
-            <div v-else class="json-tree__empty">
-              <p>JSON 格式錯誤</p>
-              <p>{{ issueLocation || issue?.message || '請先修正內容。' }}</p>
-            </div>
-          </div>
-        </div>
-
-        <aside class="json-status" aria-label="JSON 狀態">
-          <div class="json-status__summary" :data-valid="isValid">
-            <span class="json-status__dot" aria-hidden="true"></span>
-            <span>{{ statusLabel }}</span>
-          </div>
-
-          <dl class="json-status__stats">
-            <div>
-              <dt>行數</dt>
-              <dd>{{ stats.lines }}</dd>
-            </div>
-            <div>
-              <dt>字元</dt>
-              <dd>{{ stats.characters }}</dd>
-            </div>
-          </dl>
-
-          <div v-if="issue" class="json-status__issue">
-            <p class="json-status__issue-title">{{ issueLocation || '解析失敗' }}</p>
-            <p>{{ issue.message }}</p>
-          </div>
-
-          <div v-if="canRepair" class="json-status__repair">
-            <p class="json-status__repair-title">偵測到可修復項目</p>
-            <ul class="json-status__repair-list">
-              <li v-for="action in repairActions" :key="action.kind">
-                <span>{{ action.label }}</span>
-                <span>{{ action.count }} 處</span>
-              </li>
-            </ul>
-            <button class="json-status__repair-button" type="button" @click="repairJson">自動修復</button>
-          </div>
-
-          <p v-if="copyState === 'failed'" class="json-status__feedback">無法存取剪貼簿，請手動選取內容複製。</p>
-          <p v-if="fileState === 'failed'" class="json-status__feedback">無法讀取檔案。</p>
-          <p v-if="lastAction" class="json-status__action">{{ lastAction }}</p>
-        </aside>
-      </div>
-    </section>
+            <p v-if="copyState === 'failed'" class="text-sm text-destructive">無法存取剪貼簿，請手動選取內容複製。</p>
+            <p v-if="fileState === 'failed'" class="text-sm text-destructive">無法讀取檔案。</p>
+            <p v-if="lastAction" class="rounded-lg bg-muted/50 px-3 py-2 text-sm text-muted-foreground">{{ lastAction }}</p>
+          </CardContent>
+        </Card>
+      </aside>
+    </div>
   </section>
 </template>
-
-<style scoped>
-.json-page {
-  display: grid;
-  gap: var(--space-6);
-  max-width: 1440px;
-  margin: 0 auto;
-}
-
-.json-page__header h1 {
-  margin: 0;
-  color: var(--color-text-strong);
-  font-size: 2.4rem;
-  line-height: 1.05;
-  letter-spacing: 0;
-}
-
-.json-workbench {
-  display: grid;
-  overflow: hidden;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-xl);
-  background: var(--color-surface);
-  box-shadow: var(--shadow-panel);
-}
-
-.json-toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-  padding: var(--space-3);
-  border-bottom: 1px solid var(--color-border);
-  background: var(--color-surface-muted);
-}
-
-.json-toolbar__group {
-  display: flex;
-  gap: 3px;
-  padding: 3px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-surface);
-}
-
-.json-toolbar__file {
-  display: none;
-}
-
-.json-editor {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 290px;
-  min-height: 720px;
-}
-
-.json-editor__main,
-.json-editor__field {
-  display: grid;
-  min-width: 0;
-  grid-template-rows: auto 1fr;
-}
-
-.json-editor__label {
-  padding: var(--space-3) var(--space-4);
-  border-bottom: 1px solid var(--color-border);
-  color: var(--color-text-muted);
-  font-size: 0.82rem;
-  font-weight: 800;
-}
-
-.json-editor__textarea {
-  width: 100%;
-  min-width: 0;
-  min-height: 660px;
-  resize: vertical;
-  padding: var(--space-4);
-  border: 0;
-  color: var(--color-text-strong);
-  background: var(--color-surface);
-  font-family: var(--font-mono);
-  font-size: 0.95rem;
-  line-height: 1.62;
-  outline: none;
-  tab-size: 2;
-  white-space: pre;
-}
-
-.json-editor__textarea:focus {
-  box-shadow: inset 0 0 0 2px var(--color-focus);
-}
-
-.json-tree {
-  min-width: 0;
-  min-height: 720px;
-  overflow: auto;
-  background: var(--color-surface);
-}
-
-.json-tree__header {
-  position: sticky;
-  top: 0;
-  z-index: 1;
-  display: grid;
-  grid-template-columns: 28px minmax(220px, 0.9fr) minmax(76px, 0.35fr) minmax(160px, 1.25fr) 62px;
-  gap: var(--space-2);
-  width: 100%;
-  min-width: 760px;
-  padding: var(--space-2) var(--space-3);
-  border-bottom: 1px solid var(--color-border);
-  color: var(--color-text-soft);
-  background: var(--color-surface);
-  font-size: 0.75rem;
-  font-weight: 850;
-  text-transform: uppercase;
-}
-
-.json-tree__empty {
-  display: grid;
-  gap: var(--space-2);
-  padding: var(--space-5);
-  color: var(--color-danger);
-}
-
-.json-tree__empty p {
-  margin: 0;
-}
-
-.json-status {
-  display: grid;
-  align-content: start;
-  gap: var(--space-4);
-  padding: var(--space-4);
-  border-left: 1px solid var(--color-border);
-  background: var(--color-surface-muted);
-}
-
-.json-status__summary {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  min-height: 40px;
-  padding: 0 var(--space-3);
-  border-radius: var(--radius-md);
-  color: var(--color-danger);
-  background: var(--color-surface);
-  font-weight: 850;
-}
-
-.json-status__summary[data-valid='true'] {
-  color: var(--color-success-strong);
-}
-
-.json-status__dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: currentColor;
-}
-
-.json-status__stats {
-  display: grid;
-  gap: var(--space-2);
-  margin: 0;
-}
-
-.json-status__stats div {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-  min-height: 36px;
-  padding: 0 var(--space-3);
-  border-radius: var(--radius-sm);
-  background: var(--color-surface);
-}
-
-.json-status__stats dt {
-  color: var(--color-text-muted);
-  font-weight: 700;
-}
-
-.json-status__stats dd {
-  margin: 0;
-  color: var(--color-text-strong);
-  font-family: var(--font-mono);
-  font-weight: 800;
-}
-
-.json-status__issue,
-.json-status__repair,
-.json-status__feedback,
-.json-status__action {
-  margin: 0;
-  padding: var(--space-3);
-  border-radius: var(--radius-md);
-  background: var(--color-surface);
-}
-
-.json-status__issue {
-  color: var(--color-danger);
-}
-
-.json-status__issue p {
-  margin: 0;
-}
-
-.json-status__issue p + p {
-  margin-top: var(--space-2);
-}
-
-.json-status__issue-title {
-  font-weight: 850;
-}
-
-.json-status__repair {
-  display: grid;
-  gap: var(--space-3);
-  color: var(--color-text);
-}
-
-.json-status__repair-title {
-  margin: 0;
-  color: var(--color-text-strong);
-  font-weight: 850;
-}
-
-.json-status__repair-list {
-  display: grid;
-  gap: var(--space-2);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.json-status__repair-list li {
-  display: flex;
-  align-items: start;
-  justify-content: space-between;
-  gap: var(--space-3);
-  color: var(--color-text-muted);
-  font-size: 0.9rem;
-}
-
-.json-status__repair-list span:last-child {
-  flex: 0 0 auto;
-  color: var(--color-text-strong);
-  font-family: var(--font-mono);
-  font-weight: 800;
-}
-
-.json-status__repair-button {
-  min-height: 36px;
-  padding: 0 var(--space-3);
-  border: 0;
-  border-radius: var(--radius-sm);
-  color: var(--color-on-primary);
-  background: var(--color-primary);
-  font: inherit;
-  font-weight: 850;
-  cursor: pointer;
-}
-
-.json-status__repair-button:hover {
-  background: var(--color-primary-hover);
-}
-
-.json-status__repair-button:focus-visible {
-  outline: 2px solid var(--color-focus);
-  outline-offset: 2px;
-}
-
-.json-status__feedback {
-  color: var(--color-danger);
-}
-
-.json-status__action {
-  color: var(--color-text-muted);
-}
-
-.icon-button {
-  display: grid;
-  min-width: 38px;
-  min-height: 34px;
-  place-items: center;
-  padding: 0 var(--space-2);
-  border: 0;
-  border-radius: var(--radius-sm);
-  color: var(--color-text-strong);
-  background: transparent;
-  font: inherit;
-  font-family: var(--font-mono);
-  font-weight: 900;
-  cursor: pointer;
-}
-
-.icon-button:hover:not(:disabled),
-.icon-button--active {
-  color: var(--color-primary-strong);
-  background: var(--color-primary-soft);
-}
-
-.icon-button--danger {
-  color: var(--color-danger);
-}
-
-.icon-button:disabled {
-  cursor: not-allowed;
-  opacity: 0.45;
-}
-
-.icon-button:focus-visible {
-  outline: 2px solid var(--color-focus);
-  outline-offset: 2px;
-}
-
-.sample-document-icon {
-  position: relative;
-  width: 18px;
-  height: 18px;
-}
-
-.sample-document-icon::before {
-  position: absolute;
-  top: 1px;
-  left: 3px;
-  width: 12px;
-  height: 16px;
-  border: 2px solid currentColor;
-  border-radius: 3px;
-  content: '';
-}
-
-.sample-document-icon::after {
-  position: absolute;
-  top: 3px;
-  right: 1px;
-  width: 5px;
-  height: 5px;
-  border-bottom: 2px solid currentColor;
-  border-left: 2px solid currentColor;
-  background: var(--color-surface);
-  content: '';
-}
-
-.sample-document-icon__line,
-.sample-document-icon__line::before {
-  position: absolute;
-  left: 6px;
-  width: 6px;
-  height: 2px;
-  border-radius: 999px;
-  background: currentColor;
-  content: '';
-}
-
-.sample-document-icon__line {
-  top: 9px;
-}
-
-.sample-document-icon__line::before {
-  top: 4px;
-  left: 0;
-}
-
-.file-transfer-icon {
-  position: relative;
-  width: 18px;
-  height: 18px;
-}
-
-.file-transfer-icon::after {
-  position: absolute;
-  right: 2px;
-  bottom: 1px;
-  left: 2px;
-  height: 5px;
-  border: 2px solid currentColor;
-  border-top: 0;
-  border-radius: 0 0 3px 3px;
-  content: '';
-}
-
-.file-transfer-icon__arrow {
-  position: absolute;
-  left: 50%;
-  width: 2px;
-  height: 10px;
-  border-radius: 999px;
-  background: currentColor;
-  transform: translateX(-50%);
-}
-
-.file-transfer-icon__arrow::before,
-.file-transfer-icon__arrow::after {
-  position: absolute;
-  width: 7px;
-  height: 2px;
-  border-radius: 999px;
-  background: currentColor;
-  content: '';
-}
-
-.file-transfer-icon--upload .file-transfer-icon__arrow {
-  top: 2px;
-}
-
-.file-transfer-icon--upload .file-transfer-icon__arrow::before,
-.file-transfer-icon--upload .file-transfer-icon__arrow::after {
-  top: 1px;
-}
-
-.file-transfer-icon--upload .file-transfer-icon__arrow::before {
-  right: 0;
-  transform: rotate(-45deg);
-  transform-origin: right center;
-}
-
-.file-transfer-icon--upload .file-transfer-icon__arrow::after {
-  left: 0;
-  transform: rotate(45deg);
-  transform-origin: left center;
-}
-
-.file-transfer-icon--download .file-transfer-icon__arrow {
-  top: 1px;
-}
-
-.file-transfer-icon--download .file-transfer-icon__arrow::before,
-.file-transfer-icon--download .file-transfer-icon__arrow::after {
-  bottom: 1px;
-}
-
-.file-transfer-icon--download .file-transfer-icon__arrow::before {
-  right: 0;
-  transform: rotate(45deg);
-  transform-origin: right center;
-}
-
-.file-transfer-icon--download .file-transfer-icon__arrow::after {
-  left: 0;
-  transform: rotate(-45deg);
-  transform-origin: left center;
-}
-
-.tree-action-icon {
-  position: relative;
-  width: 18px;
-  height: 18px;
-}
-
-.tree-action-icon__chevron {
-  position: absolute;
-  left: 50%;
-  width: 12px;
-  height: 6px;
-  transform: translateX(-50%);
-}
-
-.tree-action-icon__chevron:first-child {
-  top: 1px;
-}
-
-.tree-action-icon__chevron:last-child {
-  bottom: 1px;
-}
-
-.tree-action-icon__chevron::before,
-.tree-action-icon__chevron::after {
-  position: absolute;
-  top: 2px;
-  width: 8px;
-  height: 2px;
-  border-radius: 999px;
-  background: currentColor;
-  content: '';
-}
-
-.tree-action-icon__chevron::before {
-  left: 0;
-}
-
-.tree-action-icon__chevron::after {
-  right: 0;
-}
-
-.tree-action-icon__chevron--up::before {
-  transform: rotate(-38deg);
-}
-
-.tree-action-icon__chevron--up::after {
-  transform: rotate(38deg);
-}
-
-.tree-action-icon__chevron--down::before {
-  transform: rotate(38deg);
-}
-
-.tree-action-icon__chevron--down::after {
-  transform: rotate(-38deg);
-}
-
-@media (max-width: 900px) {
-  .json-editor {
-    grid-template-columns: 1fr;
-  }
-
-  .json-status {
-    border-top: 1px solid var(--color-border);
-    border-left: 0;
-  }
-}
-
-@media (max-width: 720px) {
-  .json-tree__header {
-    grid-template-columns: 28px minmax(220px, 1fr) minmax(160px, 1fr) 62px;
-  }
-
-  .json-tree__header span:nth-child(3) {
-    display: none;
-  }
-}
-
-@media (max-width: 620px) {
-  .json-page__header h1 {
-    font-size: 2rem;
-  }
-
-  .json-toolbar__group {
-    flex: 1 1 auto;
-  }
-
-  .icon-button {
-    flex: 1 1 38px;
-  }
-}
-</style>
