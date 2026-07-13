@@ -20,7 +20,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { ButtonGroup } from '@/components/ui/button-group'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area'
 import { Textarea } from '@/components/ui/textarea'
 import { useJsonEditor } from '@/composables/useJsonEditor'
@@ -153,12 +153,10 @@ function handleFileChange(event: Event) {
 
     <div class="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1fr)_19rem]">
       <Card class="min-w-0 overflow-hidden">
-        <CardHeader class="flex-row items-start justify-between gap-3 border-b px-4 pb-4 sm:px-5">
-          <div class="space-y-1.5">
-            <CardTitle>{{ viewMode === 'text' ? 'JSON 內容' : '樹狀內容' }}</CardTitle>
-            <CardDescription>{{ viewMode === 'text' ? '直接編輯原始 JSON。' : '點選 key 或 value 即可修改。' }}</CardDescription>
-          </div>
-          <Badge :variant="isValid ? 'default' : 'destructive'">{{ statusLabel }}</Badge>
+        <CardHeader class="border-b px-4 pb-4 sm:px-5">
+          <CardTitle>{{ viewMode === 'text' ? 'JSON 內容' : '樹狀內容' }}</CardTitle>
+          <CardDescription>{{ viewMode === 'text' ? '直接編輯原始 JSON。' : '點選 key 或 value 即可修改。' }}</CardDescription>
+          <CardAction><Badge :variant="isValid ? 'default' : 'destructive'">{{ statusLabel }}</Badge></CardAction>
         </CardHeader>
 
         <CardContent v-if="viewMode === 'text'" class="px-4 sm:px-5">

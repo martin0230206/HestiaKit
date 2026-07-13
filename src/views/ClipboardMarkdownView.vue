@@ -2,7 +2,7 @@
 import { CheckIcon, ClipboardIcon, FileTextIcon, SparklesIcon, Trash2Icon } from '@lucide/vue'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Textarea } from '@/components/ui/textarea'
 import { useClipboardMarkdown } from '@/composables/useClipboardMarkdown'
 
@@ -53,15 +53,15 @@ const {
     <div class="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1fr)_19rem]">
       <main class="grid min-w-0 gap-5 lg:grid-cols-2">
         <Card class="min-w-0">
-          <CardHeader class="flex-row items-start justify-between gap-3 border-b px-4 pb-4 sm:px-5">
-            <div class="space-y-1.5">
-              <CardTitle>來源</CardTitle>
-              <CardDescription>可直接貼上含格式的網頁內容。</CardDescription>
-            </div>
-            <Badge variant="outline">
-              <FileTextIcon />
-              {{ inputMode === 'html' ? 'HTML' : 'Text' }}
-            </Badge>
+          <CardHeader class="border-b px-4 pb-4 sm:px-5">
+            <CardTitle>來源</CardTitle>
+            <CardDescription>可直接貼上含格式的網頁內容。</CardDescription>
+            <CardAction>
+              <Badge variant="outline">
+                <FileTextIcon />
+                {{ inputMode === 'html' ? 'HTML' : 'Text' }}
+              </Badge>
+            </CardAction>
           </CardHeader>
           <CardContent class="grid gap-4 px-4 sm:px-5">
             <Textarea
@@ -88,15 +88,15 @@ const {
         </Card>
 
         <Card class="min-w-0">
-          <CardHeader class="flex-row items-start justify-between gap-3 border-b px-4 pb-4 sm:px-5">
-            <div class="space-y-1.5">
-              <CardTitle>Markdown</CardTitle>
-              <CardDescription>轉換結果會隨來源內容更新。</CardDescription>
-            </div>
-            <Button size="icon" :disabled="!output || !isValid" aria-label="複製 Markdown" @click="copyOutput">
-              <CheckIcon v-if="copyState === 'copied'" />
-              <ClipboardIcon v-else />
-            </Button>
+          <CardHeader class="border-b px-4 pb-4 sm:px-5">
+            <CardTitle>Markdown</CardTitle>
+            <CardDescription>轉換結果會隨來源內容更新。</CardDescription>
+            <CardAction>
+              <Button size="icon" :disabled="!output || !isValid" aria-label="複製 Markdown" @click="copyOutput">
+                <CheckIcon v-if="copyState === 'copied'" />
+                <ClipboardIcon v-else />
+              </Button>
+            </CardAction>
           </CardHeader>
           <CardContent class="grid gap-4 px-4 sm:px-5">
             <Textarea
@@ -127,10 +127,8 @@ const {
       <aside class="grid content-start gap-5" aria-label="轉換狀態">
         <Card>
           <CardHeader class="border-b px-4 pb-4">
-            <div class="flex items-center justify-between gap-3">
-              <CardTitle>轉換狀態</CardTitle>
-              <Badge :variant="isValid ? 'default' : 'destructive'">{{ statusLabel }}</Badge>
-            </div>
+            <CardTitle>轉換狀態</CardTitle>
+            <CardAction><Badge :variant="isValid ? 'default' : 'destructive'">{{ statusLabel }}</Badge></CardAction>
           </CardHeader>
           <CardContent class="px-4">
             <dl class="grid gap-4 text-sm">

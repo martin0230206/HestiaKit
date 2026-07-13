@@ -4,7 +4,7 @@ import { CheckIcon, ClipboardIcon, SparklesIcon, TablePropertiesIcon, Trash2Icon
 import SegmentedControl from '@/components/forms/SegmentedControl.vue'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Textarea } from '@/components/ui/textarea'
 import { useJsonMarkdownTable } from '@/composables/useJsonMarkdownTable'
 
@@ -88,15 +88,15 @@ const issueLocation = computed(() => formatIssueLocation(issue.value))
         </Card>
 
         <Card class="min-w-0">
-          <CardHeader class="flex-row items-start justify-between gap-3 border-b px-4 pb-4 sm:px-5">
-            <div class="space-y-1.5">
-              <CardTitle>Markdown 表格</CardTitle>
-              <CardDescription>特殊字元與換行會自動處理。</CardDescription>
-            </div>
-            <Button size="icon" :disabled="!output || !isValid" aria-label="複製 Markdown" @click="copyOutput">
-              <CheckIcon v-if="copyState === 'copied'" />
-              <ClipboardIcon v-else />
-            </Button>
+          <CardHeader class="border-b px-4 pb-4 sm:px-5">
+            <CardTitle>Markdown 表格</CardTitle>
+            <CardDescription>特殊字元與換行會自動處理。</CardDescription>
+            <CardAction>
+              <Button size="icon" :disabled="!output || !isValid" aria-label="複製 Markdown" @click="copyOutput">
+                <CheckIcon v-if="copyState === 'copied'" />
+                <ClipboardIcon v-else />
+              </Button>
+            </CardAction>
           </CardHeader>
           <CardContent class="grid gap-4 px-4 sm:px-5">
             <Textarea
@@ -117,13 +117,13 @@ const issueLocation = computed(() => formatIssueLocation(issue.value))
       <aside class="grid content-start gap-5" aria-label="轉換狀態">
         <Card>
           <CardHeader class="border-b px-4 pb-4">
-            <div class="flex items-center justify-between gap-3">
-              <CardTitle>表格摘要</CardTitle>
+            <CardTitle>表格摘要</CardTitle>
+            <CardAction>
               <Badge :variant="isValid ? 'default' : 'destructive'">
                 <TablePropertiesIcon />
                 {{ statusLabel }}
               </Badge>
-            </div>
+            </CardAction>
           </CardHeader>
           <CardContent class="px-4">
             <dl class="grid gap-4 text-sm">
