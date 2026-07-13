@@ -3,7 +3,7 @@ import { CheckIcon, ClipboardIcon, SparklesIcon, Trash2Icon } from '@lucide/vue'
 import SwitchControl from '@/components/forms/SwitchControl.vue'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Textarea } from '@/components/ui/textarea'
 import { useDuplicateItems } from '@/composables/useDuplicateItems'
 
@@ -79,15 +79,15 @@ const {
         </Card>
 
         <Card class="min-w-0">
-          <CardHeader class="flex-row items-start justify-between gap-3 border-b px-4 pb-4 sm:px-5">
-            <div class="space-y-1.5">
-              <CardTitle>唯一項目</CardTitle>
-              <CardDescription>依原始順序輸出去重結果。</CardDescription>
-            </div>
-            <Button size="icon" :disabled="!output" aria-label="複製結果" @click="copyOutput">
-              <CheckIcon v-if="copyState === 'copied'" />
-              <ClipboardIcon v-else />
-            </Button>
+          <CardHeader class="border-b px-4 pb-4 sm:px-5">
+            <CardTitle>唯一項目</CardTitle>
+            <CardDescription>依原始順序輸出去重結果。</CardDescription>
+            <CardAction>
+              <Button size="icon" :disabled="!output" aria-label="複製結果" @click="copyOutput">
+                <CheckIcon v-if="copyState === 'copied'" />
+                <ClipboardIcon v-else />
+              </Button>
+            </CardAction>
           </CardHeader>
           <CardContent class="grid gap-4 px-4 sm:px-5">
             <Textarea
@@ -114,10 +114,8 @@ const {
       <aside class="grid content-start gap-5" aria-label="去重設定">
         <Card>
           <CardHeader class="border-b px-4 pb-4">
-            <div class="flex items-center justify-between gap-3">
-              <CardTitle>比對設定</CardTitle>
-              <Badge :variant="source ? 'default' : 'secondary'">{{ statusLabel }}</Badge>
-            </div>
+            <CardTitle>比對設定</CardTitle>
+            <CardAction><Badge :variant="source ? 'default' : 'secondary'">{{ statusLabel }}</Badge></CardAction>
           </CardHeader>
           <CardContent class="grid gap-3 px-4">
             <SwitchControl v-model="trimItems" label="修剪空白" description="移除每列前後空白再比對" />

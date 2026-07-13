@@ -4,7 +4,7 @@ import { CheckIcon, ClipboardIcon, FileSpreadsheetIcon, SparklesIcon, Trash2Icon
 import SwitchControl from '@/components/forms/SwitchControl.vue'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Textarea } from '@/components/ui/textarea'
 import { useCsvTable } from '@/composables/useCsvTable'
@@ -105,15 +105,15 @@ async function handleFileChange(event: Event) {
       </Card>
 
       <Card class="min-w-0">
-        <CardHeader class="flex-row items-start justify-between gap-3 border-b px-4 pb-4 sm:px-5">
-          <div class="space-y-1.5">
-            <CardTitle>表格預覽</CardTitle>
-            <CardDescription>水平捲動可檢視較寬的資料。</CardDescription>
-          </div>
-          <Button size="icon" :disabled="!hasTable || !isValid" aria-label="複製表格" @click="copyTable">
-            <CheckIcon v-if="copyState === 'copied'" />
-            <ClipboardIcon v-else />
-          </Button>
+        <CardHeader class="border-b px-4 pb-4 sm:px-5">
+          <CardTitle>表格預覽</CardTitle>
+          <CardDescription>水平捲動可檢視較寬的資料。</CardDescription>
+          <CardAction>
+            <Button size="icon" :disabled="!hasTable || !isValid" aria-label="複製表格" @click="copyTable">
+              <CheckIcon v-if="copyState === 'copied'" />
+              <ClipboardIcon v-else />
+            </Button>
+          </CardAction>
         </CardHeader>
         <CardContent class="grid min-w-0 gap-4 px-4 sm:px-5">
           <div class="min-h-96 overflow-hidden rounded-lg border">

@@ -11,7 +11,7 @@ import {
 import SegmentedControl from '@/components/forms/SegmentedControl.vue'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Textarea } from '@/components/ui/textarea'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useBase64, type Base64HistoryRecord } from '@/composables/useBase64'
@@ -108,12 +108,14 @@ function getAlphabetLabel(record: Base64HistoryRecord) {
 
     <div class="grid gap-5 lg:grid-cols-2" aria-label="Base64 編碼與解碼">
       <Card class="min-w-0">
-        <CardHeader class="flex-row items-center justify-between border-b px-4 pb-4 sm:px-5">
+        <CardHeader class="border-b px-4 pb-4 sm:px-5">
           <div>
             <p class="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">Input</p>
             <CardTitle class="mt-1">輸入</CardTitle>
           </div>
-          <Button variant="outline" :disabled="!source" @click="clearSource">清空</Button>
+          <CardAction>
+            <Button variant="outline" :disabled="!source" @click="clearSource">清空</Button>
+          </CardAction>
         </CardHeader>
         <CardContent class="grid gap-4 px-4 sm:px-5">
           <Textarea
@@ -132,12 +134,12 @@ function getAlphabetLabel(record: Base64HistoryRecord) {
       </Card>
 
       <Card class="min-w-0">
-        <CardHeader class="flex-row items-center justify-between border-b px-4 pb-4 sm:px-5">
+        <CardHeader class="border-b px-4 pb-4 sm:px-5">
           <div>
             <p class="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">Output</p>
             <CardTitle class="mt-1">輸出</CardTitle>
           </div>
-          <div class="flex gap-2">
+          <CardAction class="flex gap-2">
             <Button
               variant="outline"
               size="icon"
@@ -158,7 +160,7 @@ function getAlphabetLabel(record: Base64HistoryRecord) {
               <CheckIcon v-if="copyState === 'copied'" />
               <ClipboardIcon v-else />
             </Button>
-          </div>
+          </CardAction>
         </CardHeader>
         <CardContent class="grid gap-4 px-4 sm:px-5">
           <Textarea
@@ -177,14 +179,16 @@ function getAlphabetLabel(record: Base64HistoryRecord) {
     </div>
 
     <Card aria-label="轉換紀錄">
-      <CardHeader class="flex-row items-center justify-between border-b px-4 pb-4 sm:px-5">
+      <CardHeader class="border-b px-4 pb-4 sm:px-5">
         <div class="flex items-center gap-3">
           <span class="flex size-8 items-center justify-center rounded-lg bg-accent text-accent-foreground"><HistoryIcon class="size-4" /></span>
           <div><CardTitle>轉換紀錄</CardTitle><p class="mt-1 text-xs text-muted-foreground">{{ history.length }} 筆本機紀錄</p></div>
         </div>
-        <Button variant="ghost" size="sm" :disabled="history.length === 0" @click="clearHistory">
-          <Trash2Icon />全部刪除
-        </Button>
+        <CardAction>
+          <Button variant="ghost" size="sm" :disabled="history.length === 0" @click="clearHistory">
+            <Trash2Icon />全部刪除
+          </Button>
+        </CardAction>
       </CardHeader>
       <CardContent class="px-4 sm:px-5">
         <div v-if="history.length === 0" class="py-8 text-center text-sm text-muted-foreground">尚無紀錄</div>

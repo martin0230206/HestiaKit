@@ -6,7 +6,7 @@ import SegmentedControl from '@/components/forms/SegmentedControl.vue'
 import SwitchControl from '@/components/forms/SwitchControl.vue'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { Input } from '@/components/ui/input'
@@ -176,9 +176,9 @@ onBeforeUnmount(() => {
     </Card>
 
     <Card aria-label="密碼設定">
-      <CardHeader class="flex-row items-center justify-between border-b px-4 pb-4 sm:px-6">
+      <CardHeader class="border-b px-4 pb-4 sm:px-6">
         <div><CardTitle>產生設定</CardTitle><p class="mt-1 text-xs text-muted-foreground">調整類型、長度與使用字元</p></div>
-        <Button variant="ghost" size="sm" @click="resetPasswordGeneratorSettings"><RotateCcwIcon />重置</Button>
+        <CardAction><Button variant="ghost" size="sm" @click="resetPasswordGeneratorSettings"><RotateCcwIcon />重置</Button></CardAction>
       </CardHeader>
 
       <CardContent class="grid gap-6 px-4 sm:px-6">
