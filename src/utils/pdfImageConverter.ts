@@ -17,6 +17,11 @@ export interface PdfPagePixelEstimate {
   width: number
 }
 
+export interface PdfConversionBatchPlan {
+  batches: number[][]
+  unbatchablePages: number[]
+}
+
 export interface PdfConversionRiskEstimate {
   dpi: number
   exceedsBatchPixels: boolean
@@ -26,8 +31,9 @@ export interface PdfConversionRiskEstimate {
   largestPagePixels: number
   pageCount: number
   requiresConfirmation: boolean
-  suggestedBatchPages: number[]
+  suggestedBatches: number[][]
   totalPixels: number
+  unbatchablePages: number[]
 }
 
 export type PdfImageFormat = 'png' | 'jpeg'
@@ -52,6 +58,45 @@ export type PdfOutputSizeResult =
 
 const PAGE_RANGE_FORMAT_ISSUE = '頁碼格式不正確，請使用例如 1-3, 5 的格式。'
 
+export function createPdfConversionBatches(
+  pages: PdfPagePixelEstimate[],
+): PdfConversionBatchPlan {
+  const batches: number[][] = []
+  const unbatchablePages: number[] = []
+  let currentBatch: number[] = []
+  let currentBatchPixels = 0
+
+  const flushCurrentBatch = () => {
+    if (currentBatch.length > 0) {
+      batches.push(currentBatch)
+      currentBatch = []
+      currentBatchPixels = 0
+    }
+  }
+
+  for (const page of pages) {
+    if (page.pixels > MAX_PDF_IMAGE_PIXELS) {
+      flushCurrentBatch()
+      unbatchablePages.push(page.pageNumber)
+      continue
+    }
+
+    if (
+      currentBatch.length >= MAX_PDF_CONVERSION_PAGES ||
+      currentBatchPixels + page.pixels > MAX_PDF_BATCH_PIXELS
+    ) {
+      flushCurrentBatch()
+    }
+
+    currentBatch.push(page.pageNumber)
+    currentBatchPixels += page.pixels
+  }
+
+  flushCurrentBatch()
+
+  return { batches, unbatchablePages }
+}
+
 export function assessPdfConversionRisk(
   pages: PdfPagePixelEstimate[],
   dpi: number,
@@ -61,22 +106,7 @@ export function assessPdfConversionRisk(
     (largest, page) => Math.max(largest, page.pixels),
     0,
   )
-  const suggestedBatchPages: number[] = []
-  let suggestedBatchPixels = 0
-
-  for (const page of pages) {
-    if (
-      suggestedBatchPages.length >= MAX_PDF_CONVERSION_PAGES ||
-      page.pixels > MAX_PDF_IMAGE_PIXELS ||
-      suggestedBatchPixels + page.pixels > MAX_PDF_BATCH_PIXELS
-    ) {
-      break
-    }
-
-    suggestedBatchPages.push(page.pageNumber)
-    suggestedBatchPixels += page.pixels
-  }
-
+  const batchPlan = createPdfConversionBatches(pages)
   const exceedsBatchPixels = totalPixels > MAX_PDF_BATCH_PIXELS
   const exceedsCanvasLimit = pages.some(
     (page) =>
@@ -100,8 +130,9 @@ export function assessPdfConversionRisk(
       exceedsCanvasLimit ||
       exceedsPageCount ||
       exceedsSinglePagePixels,
-    suggestedBatchPages,
+    suggestedBatches: batchPlan.batches,
     totalPixels,
+    unbatchablePages: batchPlan.unbatchablePages,
   }
 }
 

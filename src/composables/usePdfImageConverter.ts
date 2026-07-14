@@ -12,7 +12,6 @@ import {
   calculatePdfOutputSize,
   createPdfArchiveFilename,
   createPdfImageFilename,
-  formatPdfPageRange,
   getPdfImageEncodingOptions,
   parsePdfPageRange,
   type PdfOutputSize,
@@ -123,6 +122,9 @@ export function usePdfImageConverter() {
   const pageSelectionMode = ref<PageSelectionMode>('all')
   const pageRange = ref('')
   const jpegQuality = ref(90)
+  const activePageNumber = ref(0)
+  const conversionBatchIndex = ref(0)
+  const conversionBatchTotal = ref(0)
   const progressCompleted = ref(0)
   const progressTotal = ref(0)
   const documentMessage = ref('')
@@ -216,8 +218,9 @@ export function usePdfImageConverter() {
     const estimate = conversionEstimate.value
     return Boolean(
       estimate &&
-        estimate.suggestedBatchPages.length > 0 &&
-        estimate.suggestedBatchPages.length < estimate.pageCount,
+        !estimate.exceedsCanvasLimit &&
+        estimate.unbatchablePages.length === 0 &&
+        estimate.suggestedBatches.length > 1,
     )
   })
 
@@ -231,6 +234,9 @@ export function usePdfImageConverter() {
     dismissRiskConfirmation()
     revokeResults()
     results.value = []
+    activePageNumber.value = 0
+    conversionBatchIndex.value = 0
+    conversionBatchTotal.value = 0
     progressCompleted.value = 0
     progressTotal.value = 0
     conversionState.value = 'idle'
@@ -398,7 +404,10 @@ export function usePdfImageConverter() {
     await destroyPdfDocument()
   }
 
-  async function runConversion(plan: PdfConversionPlan) {
+  async function runConversion(
+    plan: PdfConversionPlan,
+    batches: number[][] = [plan.pages],
+  ) {
     const sequence = ++conversionSequence
     pendingConversionPlan = null
     isRiskConfirmationOpen.value = false
@@ -406,72 +415,85 @@ export function usePdfImageConverter() {
     clearResults()
     conversionState.value = 'converting'
     progressTotal.value = plan.pages.length
+    conversionBatchTotal.value = batches.length
     conversionMessage.value = ''
 
     try {
-      for (const pageNumber of plan.pages) {
+      for (const [batchIndex, batchPages] of batches.entries()) {
+        conversionBatchIndex.value = batchIndex + 1
+
+        for (const pageNumber of batchPages) {
+          if (sequence !== conversionSequence) {
+            return
+          }
+
+          activePageNumber.value = pageNumber
+          let page: PDFPageProxy | null = null
+          const canvas = document.createElement('canvas')
+
+          try {
+            page = await plan.documentProxy.getPage(pageNumber)
+            const outputSize = plan.outputSizes.get(pageNumber)
+            if (!outputSize) {
+              throw new Error(`無法取得第 ${pageNumber} 頁的輸出尺寸。`)
+            }
+
+            const viewport = page.getViewport({ scale: outputSize.scale })
+            canvas.width = outputSize.width
+            canvas.height = outputSize.height
+            renderTask = page.render({
+              canvas,
+              viewport,
+              background: '#ffffff',
+            })
+            await renderTask.promise
+
+            if (sequence !== conversionSequence) {
+              return
+            }
+
+            const blob = await canvasToBlob(
+              canvas,
+              plan.outputFormat,
+              plan.outputQuality,
+              pageNumber,
+            )
+            if (sequence !== conversionSequence) {
+              return
+            }
+
+            const filename = createPdfImageFilename(
+              plan.outputSourceName,
+              pageNumber,
+              plan.outputPageCount,
+              plan.outputFormat,
+            )
+            results.value = [
+              ...results.value,
+              {
+                pageNumber,
+                filename,
+                blob,
+                url: URL.createObjectURL(blob),
+                width: outputSize.width,
+                height: outputSize.height,
+              },
+            ]
+            progressCompleted.value += 1
+          } finally {
+            renderTask = null
+            canvas.width = 0
+            canvas.height = 0
+            page?.cleanup()
+          }
+        }
+
         if (sequence !== conversionSequence) {
           return
         }
 
-        let page: PDFPageProxy | null = null
-        const canvas = document.createElement('canvas')
-
-        try {
-          page = await plan.documentProxy.getPage(pageNumber)
-          const outputSize = plan.outputSizes.get(pageNumber)
-          if (!outputSize) {
-            throw new Error(`無法取得第 ${pageNumber} 頁的輸出尺寸。`)
-          }
-
-          const viewport = page.getViewport({ scale: outputSize.scale })
-          canvas.width = outputSize.width
-          canvas.height = outputSize.height
-          renderTask = page.render({
-            canvas,
-            viewport,
-            background: '#ffffff',
-          })
-          await renderTask.promise
-
-          if (sequence !== conversionSequence) {
-            return
-          }
-
-          const blob = await canvasToBlob(
-            canvas,
-            plan.outputFormat,
-            plan.outputQuality,
-            pageNumber,
-          )
-          if (sequence !== conversionSequence) {
-            return
-          }
-
-          const filename = createPdfImageFilename(
-            plan.outputSourceName,
-            pageNumber,
-            plan.outputPageCount,
-            plan.outputFormat,
-          )
-          results.value = [
-            ...results.value,
-            {
-              pageNumber,
-              filename,
-              blob,
-              url: URL.createObjectURL(blob),
-              width: outputSize.width,
-              height: outputSize.height,
-            },
-          ]
-          progressCompleted.value += 1
-        } finally {
-          renderTask = null
-          canvas.width = 0
-          canvas.height = 0
-          page?.cleanup()
-        }
+        await plan.documentProxy.cleanup()
+        await new Promise<void>((resolve) => setTimeout(resolve, 0))
       }
 
       if (sequence === conversionSequence) {
@@ -552,6 +574,8 @@ export function usePdfImageConverter() {
         }
       }
 
+      await documentProxy.cleanup()
+
       const plan: PdfConversionPlan = {
         documentProxy,
         outputFormat: format.value,
@@ -615,15 +639,14 @@ export function usePdfImageConverter() {
     dismissRiskConfirmation()
   }
 
-  function splitLargeConversion() {
-    const suggestedPages = conversionEstimate.value?.suggestedBatchPages ?? []
-    if (suggestedPages.length === 0) {
+  async function splitLargeConversion() {
+    const plan = pendingConversionPlan
+    const batches = conversionEstimate.value?.suggestedBatches ?? []
+    if (!plan || !canSplitLargeConversion.value) {
       return
     }
 
-    pageSelectionMode.value = 'range'
-    pageRange.value = formatPdfPageRange(suggestedPages)
-    dismissRiskConfirmation()
+    await runConversion(plan, batches)
   }
 
   function downloadResult(result: PdfImageResult) {
@@ -673,6 +696,7 @@ export function usePdfImageConverter() {
   })
 
   return {
+    activePageNumber,
     archiveState,
     canConvert,
     canContinueLargeConversion,
@@ -684,6 +708,8 @@ export function usePdfImageConverter() {
     conversionState,
     conversionMessage,
     conversionEstimate,
+    conversionBatchIndex,
+    conversionBatchTotal,
     continueLargeConversion,
     convert,
     documentState,

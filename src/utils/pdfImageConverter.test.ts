@@ -3,6 +3,7 @@ import {
   MAX_PDF_IMAGE_PIXELS,
   assessPdfConversionRisk,
   calculatePdfOutputSize,
+  createPdfConversionBatches,
   createPdfArchiveFilename,
   createPdfImageFilename,
   formatPdfPageRange,
@@ -13,6 +14,29 @@ import {
 } from './pdfImageConverter'
 
 describe('pdfImageConverter', () => {
+  describe('createPdfConversionBatches', () => {
+    it('splits 24 pages into six sequential batches under the pixel budget', () => {
+      const pages = Array.from({ length: 24 }, (_, index) => ({
+        height: 5_000,
+        pageNumber: index + 1,
+        pixels: 25_000_000,
+        width: 5_000,
+      }))
+
+      expect(createPdfConversionBatches(pages)).toEqual({
+        batches: [
+          [1, 2, 3, 4],
+          [5, 6, 7, 8],
+          [9, 10, 11, 12],
+          [13, 14, 15, 16],
+          [17, 18, 19, 20],
+          [21, 22, 23, 24],
+        ],
+        unbatchablePages: [],
+      })
+    })
+  })
+
   describe('assessPdfConversionRisk', () => {
     it('requires confirmation and suggests a safe prefix for a large architecture diagram', () => {
       expect(
@@ -35,8 +59,9 @@ describe('pdfImageConverter', () => {
         largestPagePixels: 27_620_352,
         pageCount: 5,
         requiresConfirmation: true,
-        suggestedBatchPages: [1, 2, 3, 4],
+        suggestedBatches: [[1, 2, 3, 4], [5]],
         totalPixels: 104_959_872,
+        unbatchablePages: [],
       })
     })
 
@@ -56,6 +81,8 @@ describe('pdfImageConverter', () => {
       ).toMatchObject({
         exceedsCanvasLimit: true,
         requiresConfirmation: true,
+        suggestedBatches: [],
+        unbatchablePages: [3],
       })
     })
 

@@ -35,6 +35,7 @@ const fileInput = ref<HTMLInputElement | null>(null)
 const isDragging = ref(false)
 
 const {
+  activePageNumber,
   archiveState,
   canConvert,
   canContinueLargeConversion,
@@ -46,6 +47,8 @@ const {
   conversionMessage,
   conversionState,
   conversionEstimate,
+  conversionBatchIndex,
+  conversionBatchTotal,
   continueLargeConversion,
   convert,
   documentMessage,
@@ -292,7 +295,9 @@ async function handleDrop(event: DragEvent) {
         <div>
           <CardTitle>轉換結果</CardTitle>
           <CardDescription>
-            <template v-if="conversionState === 'converting'">正在處理第 {{ progressCompleted + 1 }} 頁，共 {{ progressTotal }} 頁。</template>
+            <template v-if="conversionState === 'converting'">
+              正在處理 PDF 第 {{ activePageNumber }} 頁；共選擇 {{ progressTotal }} 頁；目前為第 {{ conversionBatchIndex }} / {{ conversionBatchTotal }} 批。
+            </template>
             <template v-else>已產生 {{ results.length }} 張圖片。</template>
           </CardDescription>
         </div>
@@ -313,6 +318,7 @@ async function handleDrop(event: DragEvent) {
         <div v-if="conversionState === 'converting'" class="grid gap-2" aria-live="polite">
           <div class="flex justify-between text-xs text-muted-foreground">
             <span>{{ progressCompleted }} / {{ progressTotal }}</span>
+            <span>第 {{ conversionBatchIndex }} / {{ conversionBatchTotal }} 批</span>
             <span>{{ progressPercent }}%</span>
           </div>
           <div

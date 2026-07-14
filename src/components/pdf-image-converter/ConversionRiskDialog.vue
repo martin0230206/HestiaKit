@@ -110,6 +110,10 @@ function handleOpenChange(open: boolean) {
               <span aria-hidden="true">•</span>
               至少一頁超過瀏覽器 Canvas 的已知技術上限，無法強制繼續。
             </li>
+            <li v-if="canSplit" class="flex gap-2 font-medium text-foreground">
+              <span aria-hidden="true">•</span>
+              可自動分成 {{ estimate.suggestedBatches.length }} 批；每批完成後會釋放 PDF 資源再接續。
+            </li>
           </ul>
         </template>
 
@@ -126,11 +130,11 @@ function handleOpenChange(open: boolean) {
           <Button
             variant="outline"
             :disabled="!canSplit"
-            :title="canSplit ? '套用建議的安全頁碼範圍' : '目前無法再分割成較安全的批次'"
+            :title="canSplit ? `依序執行 ${estimate?.suggestedBatches.length ?? 0} 個安全批次` : '目前無法分割成較安全的批次'"
             @click="emit('split')"
           >
             <LayersIcon />
-            分批轉換
+            分批轉換<span v-if="canSplit">（{{ estimate?.suggestedBatches.length }} 批）</span>
           </Button>
           <Button
             :disabled="!canContinue"

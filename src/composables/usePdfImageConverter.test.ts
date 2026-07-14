@@ -156,7 +156,7 @@ describe('usePdfImageConverter', () => {
     expect(converter.conversionEstimate.value).toMatchObject({
       dpi: 96,
       pageCount: 5,
-      suggestedBatchPages: [1, 2, 3, 4],
+      suggestedBatches: [[1, 2, 3, 4], [5]],
       totalPixels: 104_959_872,
     })
     expect(pdfMocks.renderPage).not.toHaveBeenCalled()
@@ -172,22 +172,51 @@ describe('usePdfImageConverter', () => {
     scope.stop()
   })
 
-  it('applies the suggested batch for a page count above the safe batch size', async () => {
-    const page = {
-      cleanup: pdfMocks.pageCleanup,
-      getViewport: ({ scale }: { scale: number }) => ({
-        height: 792 * scale,
-        width: 612 * scale,
-      }),
-      render: pdfMocks.renderPage,
-    }
-    pdfMocks.getPage.mockResolvedValue(page)
+  it('automatically completes every batch and releases each rendered page', async () => {
+    Object.defineProperty(URL, 'createObjectURL', {
+      configurable: true,
+      value: vi.fn((blob: Blob) => `blob:${blob.size}`),
+    })
+    Object.defineProperty(URL, 'revokeObjectURL', {
+      configurable: true,
+      value: vi.fn(),
+    })
+    const toBlob = vi
+      .spyOn(HTMLCanvasElement.prototype, 'toBlob')
+      .mockImplementation((callback) => {
+        callback(new Blob(['page image'], { type: 'image/png' }))
+      })
+    const releasedRenderedPages: number[] = []
+    const documentCleanup = vi.fn(async () => undefined)
+    pdfMocks.renderPage.mockReturnValue({
+      cancel: pdfMocks.renderCancel,
+      promise: Promise.resolve(),
+    })
+    pdfMocks.getPage.mockImplementation(async (pageNumber: number) => {
+      let rendered = false
+
+      return {
+        cleanup: vi.fn(() => {
+          if (rendered) {
+            releasedRenderedPages.push(pageNumber)
+          }
+        }),
+        getViewport: ({ scale }: { scale: number }) => ({
+          height: 3_750 * scale,
+          width: 3_750 * scale,
+        }),
+        render: () => {
+          rendered = true
+          return pdfMocks.renderPage()
+        },
+      }
+    })
     pdfMocks.getDocument.mockReturnValue({
       destroy: pdfMocks.destroy,
       promise: Promise.resolve({
-        cleanup: vi.fn(async () => undefined),
+        cleanup: documentCleanup,
         getPage: pdfMocks.getPage,
-        numPages: 24,
+        numPages: 8,
       }),
     })
 
@@ -197,7 +226,7 @@ describe('usePdfImageConverter', () => {
 
     const file = {
       arrayBuffer: vi.fn(async () => new ArrayBuffer(4)),
-      name: '24-pages.pdf',
+      name: 'eight-pages.pdf',
       size: 4,
       type: 'application/pdf',
     } as unknown as File
@@ -212,17 +241,23 @@ describe('usePdfImageConverter', () => {
     expect(converter.canConvert.value).toBe(true)
     await converter.convert()
     expect(converter.conversionEstimate.value).toMatchObject({
-      exceedsPageCount: true,
-      pageCount: 24,
-      suggestedBatchPages: Array.from({ length: 20 }, (_, index) => index + 1),
+      exceedsBatchPixels: true,
+      pageCount: 8,
+      suggestedBatches: [[1, 2, 3, 4], [5, 6, 7, 8]],
     })
     expect(converter.isRiskConfirmationOpen.value).toBe(true)
+    expect(converter.canSplitLargeConversion.value).toBe(true)
+    expect(documentCleanup).toHaveBeenCalledOnce()
+    documentCleanup.mockClear()
 
-    converter.splitLargeConversion()
+    await converter.splitLargeConversion()
 
-    expect(converter.pageSelectionMode.value).toBe('range')
-    expect(converter.pageRange.value).toBe('1-20')
+    expect(converter.conversionState.value).toBe('completed')
+    expect(converter.results.value).toHaveLength(8)
+    expect(releasedRenderedPages).toEqual([1, 2, 3, 4, 5, 6, 7, 8])
+    expect(documentCleanup).toHaveBeenCalledTimes(2)
     expect(converter.isRiskConfirmationOpen.value).toBe(false)
+    toBlob.mockRestore()
     scope.stop()
   })
 
