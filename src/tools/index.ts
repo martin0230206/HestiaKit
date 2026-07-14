@@ -3,6 +3,7 @@ import {
   BinaryIcon,
   BracesIcon,
   ClipboardTypeIcon,
+  FileImageIcon,
   FileSpreadsheetIcon,
   HashIcon,
   KeyRoundIcon,
@@ -17,6 +18,7 @@ import JsonEditorView from '../views/JsonEditorView.vue'
 import JsonMarkdownTableView from '../views/JsonMarkdownTableView.vue'
 import Md5View from '../views/Md5View.vue'
 import PasswordGeneratorView from '../views/PasswordGeneratorView.vue'
+import PdfImageConverterView from '../views/PdfImageConverterView.vue'
 
 export interface ToolCategoryDefinition {
   id: string
@@ -111,5 +113,13 @@ export const tools: ToolDefinition[] = [
     icon: ClipboardTypeIcon,
     categoryId: 'format',
     component: ClipboardMarkdownView,
+  },
+  {
+    name: 'pdf-image-converter',
+    path: 'pdf-image-converter',
+    label: 'PDF 轉圖片',
+    icon: FileImageIcon,
+    categoryId: 'format',
+    component: PdfImageConverterView,
   },
 ]
