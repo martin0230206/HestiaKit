@@ -15,6 +15,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarRail,
+  SidebarTrigger,
   useSidebar,
 } from '@/components/ui/sidebar'
 import type { AppliedTheme, DarkAccentPreference, ThemePreference } from '@/composables/useTheme'
@@ -44,21 +45,24 @@ watch(
 <template>
   <Sidebar variant="inset" collapsible="icon" aria-label="工具選單">
     <SidebarHeader class="border-b border-sidebar-border/70 p-3">
-      <SidebarMenu>
-        <SidebarMenuItem>
-          <SidebarMenuButton size="lg" as-child tooltip="HestiaKit">
-            <RouterLink :to="{ name: 'password-generator' }">
-              <span class="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-                <img :src="brandIconUrl" alt="" class="size-7" />
-              </span>
-              <span class="grid min-w-0 flex-1 text-left leading-tight">
-                <span class="truncate font-semibold">HestiaKit</span>
-                <span class="truncate text-xs text-muted-foreground">隱私優先工具箱</span>
-              </span>
-            </RouterLink>
-          </SidebarMenuButton>
-        </SidebarMenuItem>
-      </SidebarMenu>
+      <div class="flex items-center gap-1 group-data-[collapsible=icon]:justify-center">
+        <SidebarMenu class="min-w-0 flex-1 group-data-[collapsible=icon]:hidden">
+          <SidebarMenuItem>
+            <SidebarMenuButton size="lg" as-child tooltip="HestiaKit">
+              <RouterLink :to="{ name: 'password-generator' }">
+                <span class="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+                  <img :src="brandIconUrl" alt="" class="size-7" />
+                </span>
+                <span class="grid min-w-0 flex-1 text-left leading-tight">
+                  <span class="truncate font-semibold">HestiaKit</span>
+                  <span class="truncate text-xs text-muted-foreground">隱私優先工具箱</span>
+                </span>
+              </RouterLink>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+        <SidebarTrigger class="shrink-0" aria-label="收合或展開功能列" title="收合或展開功能列" />
+      </div>
     </SidebarHeader>
 
     <SidebarContent class="py-2">
