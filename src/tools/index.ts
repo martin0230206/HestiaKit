@@ -8,6 +8,7 @@ import {
   HashIcon,
   KeyRoundIcon,
   ListFilterIcon,
+  StampIcon,
   TablePropertiesIcon,
 } from '@lucide/vue'
 import Base64View from '../views/Base64View.vue'
@@ -19,6 +20,7 @@ import JsonMarkdownTableView from '../views/JsonMarkdownTableView.vue'
 import Md5View from '../views/Md5View.vue'
 import PasswordGeneratorView from '../views/PasswordGeneratorView.vue'
 import PdfImageConverterView from '../views/PdfImageConverterView.vue'
+import PdfWatermarkView from '../views/PdfWatermarkView.vue'
 
 export interface ToolCategoryDefinition {
   id: string
@@ -121,5 +123,13 @@ export const tools: ToolDefinition[] = [
     icon: FileImageIcon,
     categoryId: 'format',
     component: PdfImageConverterView,
+  },
+  {
+    name: 'pdf-watermark',
+    path: 'pdf-watermark',
+    label: 'PDF 增加浮水印',
+    icon: StampIcon,
+    categoryId: 'format',
+    component: PdfWatermarkView,
   },
 ]
