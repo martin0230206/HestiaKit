@@ -265,6 +265,49 @@ describe('usePdfImageConverter', () => {
     scope.stop()
   })
 
+  it('does not start a page that exceeds the browser canvas limit', async () => {
+    const page = {
+      cleanup: pdfMocks.pageCleanup,
+      getViewport: ({ scale }: { scale: number }) => ({
+        height: 2_916 * scale,
+        width: 5_328 * scale,
+      }),
+      render: pdfMocks.renderPage,
+    }
+    pdfMocks.getPage.mockResolvedValue(page)
+
+    const scope = effectScope()
+    const converter = scope.run(() => usePdfImageConverter())
+    expect(converter).toBeDefined()
+
+    const file = {
+      arrayBuffer: vi.fn(async () => new ArrayBuffer(4)),
+      name: 'oversized-page.pdf',
+      size: 4,
+      type: 'application/pdf',
+    } as unknown as File
+
+    await converter?.selectFile(file)
+    if (!converter) {
+      return
+    }
+
+    converter.dpi.value = '300'
+    await converter.convert()
+
+    expect(converter.conversionEstimate.value).toMatchObject({
+      exceedsCanvasLimit: true,
+      largestPagePixels: 269_730_000,
+    })
+    expect(converter.canContinueLargeConversion.value).toBe(false)
+
+    await converter.continueLargeConversion()
+
+    expect(pdfMocks.renderPage).not.toHaveBeenCalled()
+    expect(converter.isRiskConfirmationOpen.value).toBe(true)
+    scope.stop()
+  })
+
   it('keeps completed images when a later page fails', async () => {
     Object.defineProperty(URL, 'createObjectURL', {
       configurable: true,
@@ -318,6 +361,62 @@ describe('usePdfImageConverter', () => {
     expect(converter.conversionMessage.value).toBe('第 2 頁渲染失敗。')
     expect(converter.results.value).toHaveLength(1)
     expect(converter.results.value[0].pageNumber).toBe(1)
+    toBlob.mockRestore()
+    scope.stop()
+  })
+
+  it('identifies the page when image encoding runs out of browser capacity', async () => {
+    Object.defineProperty(URL, 'createObjectURL', {
+      configurable: true,
+      value: vi.fn(() => 'blob:completed-page'),
+    })
+    Object.defineProperty(URL, 'revokeObjectURL', {
+      configurable: true,
+      value: vi.fn(),
+    })
+    const toBlob = vi
+      .spyOn(HTMLCanvasElement.prototype, 'toBlob')
+      .mockImplementationOnce((callback) => {
+        callback(new Blob(['page image'], { type: 'image/png' }))
+      })
+      .mockImplementationOnce((callback) => callback(null))
+    pdfMocks.renderPage.mockReturnValue({
+      cancel: pdfMocks.renderCancel,
+      promise: Promise.resolve(),
+    })
+    pdfMocks.getDocument.mockReturnValue({
+      destroy: pdfMocks.destroy,
+      promise: Promise.resolve({
+        cleanup: vi.fn(async () => undefined),
+        getPage: pdfMocks.getPage,
+        numPages: 2,
+      }),
+    })
+
+    const scope = effectScope()
+    const converter = scope.run(() => usePdfImageConverter())
+    expect(converter).toBeDefined()
+
+    const file = {
+      arrayBuffer: vi.fn(async () => new ArrayBuffer(4)),
+      name: 'two-large-pages.pdf',
+      size: 4,
+      type: 'application/pdf',
+    } as unknown as File
+
+    await converter?.selectFile(file)
+    if (!converter) {
+      return
+    }
+
+    converter.dpi.value = '96'
+    await converter.convert()
+
+    expect(converter.conversionState.value).toBe('failed')
+    expect(converter.conversionMessage.value).toBe(
+      '第 2 頁無法建立圖片檔案，可能已超過瀏覽器可用記憶體；請降低 DPI 後重試。',
+    )
+    expect(converter.results.value).toHaveLength(1)
     toBlob.mockRestore()
     scope.stop()
   })

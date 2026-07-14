@@ -18,17 +18,18 @@ describe('pdfImageConverter', () => {
       expect(
         assessPdfConversionRisk(
           [
-            { pageNumber: 1, pixels: 19_019_520 },
-            { pageNumber: 2, pixels: 15_349_824 },
-            { pageNumber: 3, pixels: 27_620_352 },
-            { pageNumber: 4, pixels: 15_349_824 },
-            { pageNumber: 5, pixels: 27_620_352 },
+            { pageNumber: 1, width: 6_096, height: 3_120, pixels: 19_019_520 },
+            { pageNumber: 2, width: 5_076, height: 3_024, pixels: 15_349_824 },
+            { pageNumber: 3, width: 7_104, height: 3_888, pixels: 27_620_352 },
+            { pageNumber: 4, width: 5_076, height: 3_024, pixels: 15_349_824 },
+            { pageNumber: 5, width: 7_104, height: 3_888, pixels: 27_620_352 },
           ],
           96,
         ),
       ).toEqual({
         dpi: 96,
         exceedsBatchPixels: true,
+        exceedsCanvasLimit: false,
         exceedsPageCount: false,
         exceedsSinglePagePixels: false,
         largestPagePixels: 27_620_352,
@@ -37,6 +38,34 @@ describe('pdfImageConverter', () => {
         suggestedBatchPages: [1, 2, 3, 4],
         totalPixels: 104_959_872,
       })
+    })
+
+    it('distinguishes a browser canvas limit from overridable safety limits', () => {
+      expect(
+        assessPdfConversionRisk(
+          [
+            {
+              pageNumber: 3,
+              width: 22_200,
+              height: 12_150,
+              pixels: 269_730_000,
+            },
+          ],
+          300,
+        ),
+      ).toMatchObject({
+        exceedsCanvasLimit: true,
+        requiresConfirmation: true,
+      })
+    })
+
+    it('also catches a canvas dimension above the browser limit', () => {
+      expect(
+        assessPdfConversionRisk(
+          [{ pageNumber: 1, width: 32_768, height: 1, pixels: 32_768 }],
+          96,
+        ).exceedsCanvasLimit,
+      ).toBe(true)
     })
   })
 

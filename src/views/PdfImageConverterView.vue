@@ -37,6 +37,7 @@ const isDragging = ref(false)
 const {
   archiveState,
   canConvert,
+  canContinueLargeConversion,
   canReduceDpi,
   canSplitLargeConversion,
   cancelConversion,
@@ -112,6 +113,7 @@ async function handleDrop(event: DragEvent) {
     <ConversionRiskDialog
       :open="isRiskConfirmationOpen"
       :estimate="conversionEstimate"
+      :can-continue="canContinueLargeConversion"
       :can-reduce-dpi="canReduceDpi"
       :can-split="canSplitLargeConversion"
       @continue="continueLargeConversion"

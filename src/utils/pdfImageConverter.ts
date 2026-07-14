@@ -7,15 +7,20 @@ export interface PdfPageRangeResult {
 export const MAX_PDF_IMAGE_PIXELS = 34_000_000
 export const MAX_PDF_CONVERSION_PAGES = 20
 export const MAX_PDF_BATCH_PIXELS = 100_000_000
+export const MAX_PDF_CANVAS_PIXELS = 268_435_456
+export const MAX_PDF_CANVAS_DIMENSION = 32_767
 
 export interface PdfPagePixelEstimate {
+  height: number
   pageNumber: number
   pixels: number
+  width: number
 }
 
 export interface PdfConversionRiskEstimate {
   dpi: number
   exceedsBatchPixels: boolean
+  exceedsCanvasLimit: boolean
   exceedsPageCount: boolean
   exceedsSinglePagePixels: boolean
   largestPagePixels: number
@@ -73,18 +78,28 @@ export function assessPdfConversionRisk(
   }
 
   const exceedsBatchPixels = totalPixels > MAX_PDF_BATCH_PIXELS
+  const exceedsCanvasLimit = pages.some(
+    (page) =>
+      page.pixels > MAX_PDF_CANVAS_PIXELS ||
+      page.width > MAX_PDF_CANVAS_DIMENSION ||
+      page.height > MAX_PDF_CANVAS_DIMENSION,
+  )
   const exceedsPageCount = pages.length > MAX_PDF_CONVERSION_PAGES
   const exceedsSinglePagePixels = largestPagePixels > MAX_PDF_IMAGE_PIXELS
 
   return {
     dpi,
     exceedsBatchPixels,
+    exceedsCanvasLimit,
     exceedsPageCount,
     exceedsSinglePagePixels,
     largestPagePixels,
     pageCount: pages.length,
     requiresConfirmation:
-      exceedsBatchPixels || exceedsPageCount || exceedsSinglePagePixels,
+      exceedsBatchPixels ||
+      exceedsCanvasLimit ||
+      exceedsPageCount ||
+      exceedsSinglePagePixels,
     suggestedBatchPages,
     totalPixels,
   }

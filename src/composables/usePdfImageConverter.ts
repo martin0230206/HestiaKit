@@ -18,6 +18,7 @@ import {
   type PdfOutputSize,
   type PdfImageFormat,
   type PdfPageRangeResult,
+  type PdfPagePixelEstimate,
   type PdfConversionRiskEstimate,
 } from '@/utils/pdfImageConverter'
 
@@ -75,6 +76,7 @@ function canvasToBlob(
   canvas: HTMLCanvasElement,
   format: PdfImageFormat,
   jpegQualityPercent: number,
+  pageNumber: number,
 ) {
   const encoding = getPdfImageEncodingOptions(format, jpegQualityPercent)
 
@@ -84,7 +86,11 @@ function canvasToBlob(
         if (blob) {
           resolve(blob)
         } else {
-          reject(new Error('瀏覽器無法建立圖片檔案。'))
+          reject(
+            new Error(
+              `第 ${pageNumber} 頁無法建立圖片檔案，可能已超過瀏覽器可用記憶體；請降低 DPI 後重試。`,
+            ),
+          )
         }
       },
       encoding.mimeType,
@@ -203,6 +209,9 @@ export function usePdfImageConverter() {
       archiveState.value === 'preparing',
   )
   const canReduceDpi = computed(() => dpi.value !== '96')
+  const canContinueLargeConversion = computed(
+    () => conversionEstimate.value?.exceedsCanvasLimit === false,
+  )
   const canSplitLargeConversion = computed(() => {
     const estimate = conversionEstimate.value
     return Boolean(
@@ -433,6 +442,7 @@ export function usePdfImageConverter() {
             canvas,
             plan.outputFormat,
             plan.outputQuality,
+            pageNumber,
           )
           if (sequence !== conversionSequence) {
             return
@@ -508,7 +518,7 @@ export function usePdfImageConverter() {
 
     try {
       const outputSizes = new Map<number, PdfOutputSize>()
-      const pagePixelEstimates: Array<{ pageNumber: number; pixels: number }> = []
+      const pagePixelEstimates: PdfPagePixelEstimate[] = []
 
       for (const pageNumber of pages) {
         if (sequence !== conversionSequence) {
@@ -530,7 +540,12 @@ export function usePdfImageConverter() {
             throw new Error(`第 ${pageNumber} 頁：${outputSize.issue}`)
           }
 
-          pagePixelEstimates.push({ pageNumber, pixels: outputSize.pixels })
+          pagePixelEstimates.push({
+            height: outputSize.height,
+            pageNumber,
+            pixels: outputSize.pixels,
+            width: outputSize.width,
+          })
           outputSizes.set(pageNumber, outputSize)
         } finally {
           page?.cleanup()
@@ -575,7 +590,7 @@ export function usePdfImageConverter() {
 
   async function continueLargeConversion() {
     const plan = pendingConversionPlan
-    if (!plan) {
+    if (!plan || !canContinueLargeConversion.value) {
       return
     }
 
@@ -660,6 +675,7 @@ export function usePdfImageConverter() {
   return {
     archiveState,
     canConvert,
+    canContinueLargeConversion,
     canReduceDpi,
     canSplitLargeConversion,
     cancelConversion,

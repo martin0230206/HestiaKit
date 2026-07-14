@@ -17,6 +17,7 @@ import { Button } from '@/components/ui/button'
 import type { PdfConversionRiskEstimate } from '@/utils/pdfImageConverter'
 
 const props = defineProps<{
+  canContinue: boolean
   canReduceDpi: boolean
   canSplit: boolean
   estimate: PdfConversionRiskEstimate | null
@@ -38,13 +39,13 @@ function handleOpenChange(open: boolean) {
 </script>
 
 <template>
-  <AlertDialogRoot :open="open" @update:open="handleOpenChange">
+  <AlertDialogRoot v-if="open" :open="open" @update:open="handleOpenChange">
     <AlertDialogPortal>
       <AlertDialogOverlay
-        class="fixed inset-0 z-50 bg-black/60 backdrop-blur-[2px] data-[state=closed]:animate-out data-[state=open]:animate-in data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0"
+        class="fixed inset-0 z-50 bg-black/60 backdrop-blur-[2px] data-[state=open]:animate-in data-[state=open]:fade-in-0"
       />
       <AlertDialogContent
-        class="fixed left-1/2 top-1/2 z-50 grid max-h-[calc(100vh-2rem)] w-[calc(100%-2rem)] max-w-xl -translate-x-1/2 -translate-y-1/2 gap-5 overflow-y-auto rounded-xl border bg-background p-5 shadow-xl outline-none data-[state=closed]:animate-out data-[state=open]:animate-in data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 sm:p-6"
+        class="fixed left-1/2 top-1/2 z-50 grid max-h-[calc(100vh-2rem)] w-[calc(100%-2rem)] max-w-xl -translate-x-1/2 -translate-y-1/2 gap-5 overflow-y-auto rounded-xl border bg-background p-5 shadow-xl outline-none data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 sm:p-6"
       >
         <Button
           variant="ghost"
@@ -62,9 +63,16 @@ function handleOpenChange(open: boolean) {
             <TriangleAlertIcon class="size-5" />
           </span>
           <div class="grid gap-1.5">
-            <AlertDialogTitle class="text-lg font-semibold">此次轉換規模較大</AlertDialogTitle>
+            <AlertDialogTitle class="text-lg font-semibold">
+              {{ estimate?.exceedsCanvasLimit ? '目前設定超過瀏覽器上限' : '此次轉換規模較大' }}
+            </AlertDialogTitle>
             <AlertDialogDescription class="text-sm leading-6 text-muted-foreground">
-              可能造成瀏覽器卡頓、分頁重新載入或轉換結果遺失。是否仍要繼續？
+              <template v-if="estimate?.exceedsCanvasLimit">
+                至少一頁超過瀏覽器可建立的圖片容量，請降低 DPI 後再轉換。
+              </template>
+              <template v-else>
+                可能造成瀏覽器卡頓、分頁重新載入或轉換結果遺失。是否仍要繼續？
+              </template>
             </AlertDialogDescription>
           </div>
         </div>
@@ -98,6 +106,10 @@ function handleOpenChange(open: boolean) {
               <span aria-hidden="true">•</span>
               至少一頁超過建議的單頁 34,000,000 像素。
             </li>
+            <li v-if="estimate.exceedsCanvasLimit" class="flex gap-2 font-medium text-destructive">
+              <span aria-hidden="true">•</span>
+              至少一頁超過瀏覽器 Canvas 的已知技術上限，無法強制繼續。
+            </li>
           </ul>
         </template>
 
@@ -120,7 +132,11 @@ function handleOpenChange(open: boolean) {
             <LayersIcon />
             分批轉換
           </Button>
-          <Button @click="emit('continue')">
+          <Button
+            :disabled="!canContinue"
+            :title="canContinue ? '接受風險並開始轉換' : '請先降低 DPI'"
+            @click="emit('continue')"
+          >
             <TriangleAlertIcon />
             仍要繼續
           </Button>
