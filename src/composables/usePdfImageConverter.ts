@@ -8,15 +8,17 @@ import type {
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
 import {
   MAX_PDF_IMAGE_PIXELS,
+  assessPdfConversionRisk,
   calculatePdfOutputSize,
   createPdfArchiveFilename,
   createPdfImageFilename,
-  getPdfBatchPixelIssue,
+  formatPdfPageRange,
   getPdfImageEncodingOptions,
-  getPdfPageLimitIssue,
   parsePdfPageRange,
+  type PdfOutputSize,
   type PdfImageFormat,
   type PdfPageRangeResult,
+  type PdfConversionRiskEstimate,
 } from '@/utils/pdfImageConverter'
 
 type PdfJsModule = typeof import('pdfjs-dist')
@@ -33,6 +35,16 @@ export interface PdfImageResult {
   url: string
   width: number
   height: number
+}
+
+interface PdfConversionPlan {
+  documentProxy: PDFDocumentProxy
+  outputFormat: PdfImageFormat
+  outputPageCount: number
+  outputQuality: number
+  outputSizes: Map<number, PdfOutputSize>
+  outputSourceName: string
+  pages: number[]
 }
 
 const MAX_PDF_FILE_BYTES = 100 * 1024 * 1024
@@ -109,6 +121,9 @@ export function usePdfImageConverter() {
   const progressTotal = ref(0)
   const documentMessage = ref('')
   const conversionMessage = ref('')
+  const conversionEstimate = ref<PdfConversionRiskEstimate | null>(null)
+  const isRiskConfirmationOpen = ref(false)
+  const isPreparingConversion = ref(false)
   const results = ref<PdfImageResult[]>([])
 
   let pdfDocument: PDFDocumentProxy | null = null
@@ -116,6 +131,7 @@ export function usePdfImageConverter() {
   let renderTask: RenderTask | null = null
   let loadSequence = 0
   let conversionSequence = 0
+  let pendingConversionPlan: PdfConversionPlan | null = null
 
   const formatOptions: Array<{ label: string; value: PdfImageFormat }> = [
     { label: 'PNG', value: 'png' },
@@ -137,21 +153,10 @@ export function usePdfImageConverter() {
     }
 
     if (pageSelectionMode.value === 'all') {
-      const issue = getPdfPageLimitIssue(pageCount.value)
-      if (issue) {
-        return { ok: false, issue, pages: [] }
-      }
-
       return { ok: true, pages: createAllPages(pageCount.value) }
     }
 
-    const result = parsePdfPageRange(pageRange.value, pageCount.value)
-    if (!result.ok) {
-      return result
-    }
-
-    const issue = getPdfPageLimitIssue(result.pages.length)
-    return issue ? { ok: false, issue, pages: [] } : result
+    return parsePdfPageRange(pageRange.value, pageCount.value, pageCount.value)
   })
   const pageSelectionIssue = computed(() => {
     if (pageSelectionResult.value.ok) {
@@ -166,6 +171,7 @@ export function usePdfImageConverter() {
       documentState.value === 'ready' &&
       pageSelectionResult.value.ok &&
       selectedPageCount.value > 0 &&
+      !isPreparingConversion.value &&
       conversionState.value !== 'converting',
   )
   const progressPercent = computed(() => {
@@ -192,9 +198,19 @@ export function usePdfImageConverter() {
   const isBusy = computed(
     () =>
       documentState.value === 'loading' ||
+      isPreparingConversion.value ||
       conversionState.value === 'converting' ||
       archiveState.value === 'preparing',
   )
+  const canReduceDpi = computed(() => dpi.value !== '96')
+  const canSplitLargeConversion = computed(() => {
+    const estimate = conversionEstimate.value
+    return Boolean(
+      estimate &&
+        estimate.suggestedBatchPages.length > 0 &&
+        estimate.suggestedBatchPages.length < estimate.pageCount,
+    )
+  })
 
   function revokeResults() {
     for (const result of results.value) {
@@ -203,6 +219,7 @@ export function usePdfImageConverter() {
   }
 
   function clearResults() {
+    dismissRiskConfirmation()
     revokeResults()
     results.value = []
     progressCompleted.value = 0
@@ -320,6 +337,7 @@ export function usePdfImageConverter() {
 
   async function selectFile(file: File) {
     cancelConversion()
+    dismissRiskConfirmation()
     clearResults()
     loadSequence += 1
     await destroyPdfDocument()
@@ -354,6 +372,7 @@ export function usePdfImageConverter() {
   }
 
   async function clearFile() {
+    dismissRiskConfirmation()
     loadSequence += 1
     conversionSequence += 1
     renderTask?.cancel()
@@ -366,71 +385,22 @@ export function usePdfImageConverter() {
     documentState.value = 'idle'
     documentMessage.value = ''
     conversionMessage.value = ''
+    isPreparingConversion.value = false
     await destroyPdfDocument()
   }
 
-  async function convert() {
-    const pages = [...pageSelectionResult.value.pages]
-    if (!pageSelectionResult.value.ok || pages.length === 0) {
-      return
-    }
-
-    if (!pdfDocument) {
-      await loadDocument(true)
-    }
-
-    const documentProxy = pdfDocument
-    if (!documentProxy) {
-      return
-    }
-
-    clearResults()
+  async function runConversion(plan: PdfConversionPlan) {
     const sequence = ++conversionSequence
-    const outputFormat = format.value
-    const outputDpi = Number(dpi.value)
-    const outputQuality = jpegQuality.value
-    const outputPageCount = pageCount.value
-    const outputSourceName = selectedFile.value?.name ?? 'pdf'
+    pendingConversionPlan = null
+    isRiskConfirmationOpen.value = false
+    conversionEstimate.value = null
+    clearResults()
     conversionState.value = 'converting'
-    progressTotal.value = pages.length
+    progressTotal.value = plan.pages.length
     conversionMessage.value = ''
 
     try {
-      const outputSizes = new Map<number, { height: number; scale: number; width: number }>()
-      let totalOutputPixels = 0
-
-      for (const pageNumber of pages) {
-        if (sequence !== conversionSequence) {
-          return
-        }
-
-        let page: PDFPageProxy | null = null
-        try {
-          page = await documentProxy.getPage(pageNumber)
-          const baseViewport = page.getViewport({ scale: 1 })
-          const outputSize = calculatePdfOutputSize(
-            baseViewport.width,
-            baseViewport.height,
-            outputDpi,
-          )
-
-          if (!outputSize.ok) {
-            throw new Error(`第 ${pageNumber} 頁：${outputSize.issue}`)
-          }
-
-          totalOutputPixels += outputSize.pixels
-          const batchPixelIssue = getPdfBatchPixelIssue(totalOutputPixels)
-          if (batchPixelIssue) {
-            throw new Error(batchPixelIssue)
-          }
-
-          outputSizes.set(pageNumber, outputSize)
-        } finally {
-          page?.cleanup()
-        }
-      }
-
-      for (const pageNumber of pages) {
+      for (const pageNumber of plan.pages) {
         if (sequence !== conversionSequence) {
           return
         }
@@ -439,8 +409,8 @@ export function usePdfImageConverter() {
         const canvas = document.createElement('canvas')
 
         try {
-          page = await documentProxy.getPage(pageNumber)
-          const outputSize = outputSizes.get(pageNumber)
+          page = await plan.documentProxy.getPage(pageNumber)
+          const outputSize = plan.outputSizes.get(pageNumber)
           if (!outputSize) {
             throw new Error(`無法取得第 ${pageNumber} 頁的輸出尺寸。`)
           }
@@ -459,16 +429,20 @@ export function usePdfImageConverter() {
             return
           }
 
-          const blob = await canvasToBlob(canvas, outputFormat, outputQuality)
+          const blob = await canvasToBlob(
+            canvas,
+            plan.outputFormat,
+            plan.outputQuality,
+          )
           if (sequence !== conversionSequence) {
             return
           }
 
           const filename = createPdfImageFilename(
-            outputSourceName,
+            plan.outputSourceName,
             pageNumber,
-            outputPageCount,
-            outputFormat,
+            plan.outputPageCount,
+            plan.outputFormat,
           )
           results.value = [
             ...results.value,
@@ -506,6 +480,135 @@ export function usePdfImageConverter() {
       conversionMessage.value = error instanceof Error ? error.message : '轉換失敗，請稍後再試。'
       await destroyPdfDocument()
     }
+  }
+
+  async function convert() {
+    if (isPreparingConversion.value) {
+      return
+    }
+
+    const pages = [...pageSelectionResult.value.pages]
+    if (!pageSelectionResult.value.ok || pages.length === 0) {
+      return
+    }
+
+    if (!pdfDocument) {
+      await loadDocument(true)
+    }
+
+    const documentProxy = pdfDocument
+    if (!documentProxy) {
+      return
+    }
+
+    const sequence = ++conversionSequence
+    const outputDpi = Number(dpi.value)
+    conversionMessage.value = ''
+    isPreparingConversion.value = true
+
+    try {
+      const outputSizes = new Map<number, PdfOutputSize>()
+      const pagePixelEstimates: Array<{ pageNumber: number; pixels: number }> = []
+
+      for (const pageNumber of pages) {
+        if (sequence !== conversionSequence) {
+          return
+        }
+
+        let page: PDFPageProxy | null = null
+        try {
+          page = await documentProxy.getPage(pageNumber)
+          const baseViewport = page.getViewport({ scale: 1 })
+          const outputSize = calculatePdfOutputSize(
+            baseViewport.width,
+            baseViewport.height,
+            outputDpi,
+            Number.POSITIVE_INFINITY,
+          )
+
+          if (!outputSize.ok) {
+            throw new Error(`第 ${pageNumber} 頁：${outputSize.issue}`)
+          }
+
+          pagePixelEstimates.push({ pageNumber, pixels: outputSize.pixels })
+          outputSizes.set(pageNumber, outputSize)
+        } finally {
+          page?.cleanup()
+        }
+      }
+
+      const plan: PdfConversionPlan = {
+        documentProxy,
+        outputFormat: format.value,
+        outputPageCount: pageCount.value,
+        outputQuality: jpegQuality.value,
+        outputSizes,
+        outputSourceName: selectedFile.value?.name ?? 'pdf',
+        pages,
+      }
+      const estimate = assessPdfConversionRisk(pagePixelEstimates, outputDpi)
+
+      if (estimate.requiresConfirmation) {
+        pendingConversionPlan = plan
+        conversionEstimate.value = estimate
+        isRiskConfirmationOpen.value = true
+        return
+      }
+
+      isPreparingConversion.value = false
+      await runConversion(plan)
+    } catch (error) {
+      if (sequence !== conversionSequence) {
+        return
+      }
+
+      password.value = ''
+      conversionState.value = 'failed'
+      conversionMessage.value = error instanceof Error ? error.message : '轉換失敗，請稍後再試。'
+      await destroyPdfDocument()
+    } finally {
+      if (sequence === conversionSequence) {
+        isPreparingConversion.value = false
+      }
+    }
+  }
+
+  async function continueLargeConversion() {
+    const plan = pendingConversionPlan
+    if (!plan) {
+      return
+    }
+
+    await runConversion(plan)
+  }
+
+  function dismissRiskConfirmation() {
+    pendingConversionPlan = null
+    conversionEstimate.value = null
+    isRiskConfirmationOpen.value = false
+  }
+
+  function reduceConversionDpi() {
+    if (dpi.value === '300') {
+      dpi.value = '150'
+    } else if (dpi.value === '150') {
+      dpi.value = '96'
+    } else {
+      return
+    }
+
+    dismissRiskConfirmation()
+  }
+
+  function splitLargeConversion() {
+    const suggestedPages = conversionEstimate.value?.suggestedBatchPages ?? []
+    if (suggestedPages.length === 0) {
+      return
+    }
+
+    pageSelectionMode.value = 'range'
+    pageRange.value = formatPdfPageRange(suggestedPages)
+    dismissRiskConfirmation()
   }
 
   function downloadResult(result: PdfImageResult) {
@@ -557,15 +660,20 @@ export function usePdfImageConverter() {
   return {
     archiveState,
     canConvert,
+    canReduceDpi,
+    canSplitLargeConversion,
     cancelConversion,
     clearFile,
     clearResults,
     conversionState,
     conversionMessage,
+    conversionEstimate,
+    continueLargeConversion,
     convert,
     documentState,
     documentStateLabel,
     documentMessage,
+    dismissRiskConfirmation,
     downloadAll,
     downloadResult,
     dpi,
@@ -573,6 +681,8 @@ export function usePdfImageConverter() {
     format,
     formatOptions,
     isBusy,
+    isPreparingConversion,
+    isRiskConfirmationOpen,
     jpegQuality,
     pageCount,
     pageRange,
@@ -583,10 +693,12 @@ export function usePdfImageConverter() {
     progressCompleted,
     progressPercent,
     progressTotal,
+    reduceConversionDpi,
     results,
     selectFile,
     selectedFile,
     selectedPageCount,
+    splitLargeConversion,
     unlockDocument,
   }
 }

@@ -8,26 +8,87 @@ export const MAX_PDF_IMAGE_PIXELS = 34_000_000
 export const MAX_PDF_CONVERSION_PAGES = 20
 export const MAX_PDF_BATCH_PIXELS = 100_000_000
 
+export interface PdfPagePixelEstimate {
+  pageNumber: number
+  pixels: number
+}
+
+export interface PdfConversionRiskEstimate {
+  dpi: number
+  exceedsBatchPixels: boolean
+  exceedsPageCount: boolean
+  exceedsSinglePagePixels: boolean
+  largestPagePixels: number
+  pageCount: number
+  requiresConfirmation: boolean
+  suggestedBatchPages: number[]
+  totalPixels: number
+}
+
 export type PdfImageFormat = 'png' | 'jpeg'
 
 export type PdfImageEncodingOptions =
   | { mimeType: 'image/png' }
   | { mimeType: 'image/jpeg'; quality: number }
 
+export interface PdfOutputSize {
+  width: number
+  height: number
+  pixels: number
+  scale: number
+}
+
 export type PdfOutputSizeResult =
-  | {
-      ok: true
-      width: number
-      height: number
-      pixels: number
-      scale: number
-    }
+  | ({ ok: true } & PdfOutputSize)
   | {
       ok: false
       issue: string
     }
 
 const PAGE_RANGE_FORMAT_ISSUE = '頁碼格式不正確，請使用例如 1-3, 5 的格式。'
+
+export function assessPdfConversionRisk(
+  pages: PdfPagePixelEstimate[],
+  dpi: number,
+): PdfConversionRiskEstimate {
+  const totalPixels = pages.reduce((total, page) => total + page.pixels, 0)
+  const largestPagePixels = pages.reduce(
+    (largest, page) => Math.max(largest, page.pixels),
+    0,
+  )
+  const suggestedBatchPages: number[] = []
+  let suggestedBatchPixels = 0
+
+  for (const page of pages) {
+    if (
+      suggestedBatchPages.length >= MAX_PDF_CONVERSION_PAGES ||
+      page.pixels > MAX_PDF_IMAGE_PIXELS ||
+      suggestedBatchPixels + page.pixels > MAX_PDF_BATCH_PIXELS
+    ) {
+      break
+    }
+
+    suggestedBatchPages.push(page.pageNumber)
+    suggestedBatchPixels += page.pixels
+  }
+
+  const exceedsBatchPixels = totalPixels > MAX_PDF_BATCH_PIXELS
+  const exceedsPageCount = pages.length > MAX_PDF_CONVERSION_PAGES
+  const exceedsSinglePagePixels = largestPagePixels > MAX_PDF_IMAGE_PIXELS
+
+  return {
+    dpi,
+    exceedsBatchPixels,
+    exceedsPageCount,
+    exceedsSinglePagePixels,
+    largestPagePixels,
+    pageCount: pages.length,
+    requiresConfirmation:
+      exceedsBatchPixels || exceedsPageCount || exceedsSinglePagePixels,
+    suggestedBatchPages,
+    totalPixels,
+  }
+}
 
 export function parsePdfPageRange(
   input: string,
@@ -83,6 +144,33 @@ export function parsePdfPageRange(
   }
 }
 
+export function formatPdfPageRange(pages: number[]): string {
+  const segments: string[] = []
+  let rangeStart = pages[0]
+  let previousPage = pages[0]
+
+  for (const page of pages.slice(1)) {
+    if (page === previousPage + 1) {
+      previousPage = page
+      continue
+    }
+
+    segments.push(
+      rangeStart === previousPage ? `${rangeStart}` : `${rangeStart}-${previousPage}`,
+    )
+    rangeStart = page
+    previousPage = page
+  }
+
+  if (rangeStart !== undefined && previousPage !== undefined) {
+    segments.push(
+      rangeStart === previousPage ? `${rangeStart}` : `${rangeStart}-${previousPage}`,
+    )
+  }
+
+  return segments.join(', ')
+}
+
 export function calculatePdfOutputSize(
   widthInPoints: number,
   heightInPoints: number,
@@ -113,15 +201,6 @@ export function calculatePdfOutputSize(
   }
 
   return { ok: true, width, height, pixels, scale }
-}
-
-export function getPdfBatchPixelIssue(
-  totalPixels: number,
-  maxPixels = MAX_PDF_BATCH_PIXELS,
-): string {
-  return totalPixels > maxPixels
-    ? `選取頁面的總輸出尺寸超過安全上限（${maxPixels.toLocaleString('zh-TW')} 像素），請減少頁數或降低 DPI。`
-    : ''
 }
 
 export function createPdfImageFilename(

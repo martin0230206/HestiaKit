@@ -1,17 +1,45 @@
 import { describe, expect, it } from 'vitest'
 import {
   MAX_PDF_IMAGE_PIXELS,
+  assessPdfConversionRisk,
   calculatePdfOutputSize,
   createPdfArchiveFilename,
   createPdfImageFilename,
+  formatPdfPageRange,
   formatPdfFileSize,
-  getPdfBatchPixelIssue,
   getPdfImageEncodingOptions,
   getPdfPageLimitIssue,
   parsePdfPageRange,
 } from './pdfImageConverter'
 
 describe('pdfImageConverter', () => {
+  describe('assessPdfConversionRisk', () => {
+    it('requires confirmation and suggests a safe prefix for a large architecture diagram', () => {
+      expect(
+        assessPdfConversionRisk(
+          [
+            { pageNumber: 1, pixels: 19_019_520 },
+            { pageNumber: 2, pixels: 15_349_824 },
+            { pageNumber: 3, pixels: 27_620_352 },
+            { pageNumber: 4, pixels: 15_349_824 },
+            { pageNumber: 5, pixels: 27_620_352 },
+          ],
+          96,
+        ),
+      ).toEqual({
+        dpi: 96,
+        exceedsBatchPixels: true,
+        exceedsPageCount: false,
+        exceedsSinglePagePixels: false,
+        largestPagePixels: 27_620_352,
+        pageCount: 5,
+        requiresConfirmation: true,
+        suggestedBatchPages: [1, 2, 3, 4],
+        totalPixels: 104_959_872,
+      })
+    })
+  })
+
   describe('parsePdfPageRange', () => {
     it('parses ranges, ignores duplicates, and keeps pages in ascending order', () => {
       expect(parsePdfPageRange('5, 1-3, 3', 6)).toEqual({
@@ -40,6 +68,12 @@ describe('pdfImageConverter', () => {
         issue: '單次最多轉換 20 頁，請改用指定頁碼分批處理。',
         pages: [],
       })
+    })
+  })
+
+  describe('formatPdfPageRange', () => {
+    it('formats contiguous and separated pages without expanding the selection', () => {
+      expect(formatPdfPageRange([1, 2, 3, 5, 7, 8])).toBe('1-3, 5, 7-8')
     })
   })
 
@@ -108,13 +142,6 @@ describe('pdfImageConverter', () => {
       )
       expect(formatPdfFileSize(900)).toBe('900 B')
       expect(formatPdfFileSize(2_604)).toBe('2.5 KB')
-    })
-
-    it('limits the cumulative output pixels retained by a conversion batch', () => {
-      expect(getPdfBatchPixelIssue(100_000_000)).toBe('')
-      expect(getPdfBatchPixelIssue(100_000_001)).toBe(
-        '選取頁面的總輸出尺寸超過安全上限（100,000,000 像素），請減少頁數或降低 DPI。',
-      )
     })
   })
 })

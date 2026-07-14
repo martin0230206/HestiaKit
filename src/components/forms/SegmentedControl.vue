@@ -2,6 +2,7 @@
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 
 defineProps<{
+  disabled?: boolean
   label: string
   options: Array<{ label: string; value: T }>
 }>()
@@ -16,13 +17,14 @@ function updateModel(value: unknown) {
 </script>
 
 <template>
-  <fieldset class="grid gap-3">
+  <fieldset class="grid gap-3" :disabled="disabled">
     <legend class="text-sm font-medium text-foreground">{{ label }}</legend>
     <ToggleGroup
       type="single"
       variant="outline"
       class="segmented-control__options w-full"
       :model-value="model"
+      :disabled="disabled"
       :style="{ '--segmented-option-count': options.length }"
       @update:model-value="updateModel"
     >

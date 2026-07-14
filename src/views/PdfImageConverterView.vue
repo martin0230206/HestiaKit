@@ -15,6 +15,7 @@ import {
 } from '@lucide/vue'
 import RangeControl from '@/components/forms/RangeControl.vue'
 import SegmentedControl from '@/components/forms/SegmentedControl.vue'
+import ConversionRiskDialog from '@/components/pdf-image-converter/ConversionRiskDialog.vue'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -36,15 +37,20 @@ const isDragging = ref(false)
 const {
   archiveState,
   canConvert,
+  canReduceDpi,
+  canSplitLargeConversion,
   cancelConversion,
   clearFile,
   clearResults,
   conversionMessage,
   conversionState,
+  conversionEstimate,
+  continueLargeConversion,
   convert,
   documentMessage,
   documentState,
   documentStateLabel,
+  dismissRiskConfirmation,
   downloadAll,
   downloadResult,
   dpi,
@@ -52,6 +58,8 @@ const {
   format,
   formatOptions,
   isBusy,
+  isPreparingConversion,
+  isRiskConfirmationOpen,
   jpegQuality,
   pageCount,
   pageRange,
@@ -62,10 +70,12 @@ const {
   progressCompleted,
   progressPercent,
   progressTotal,
+  reduceConversionDpi,
   results,
   selectFile,
   selectedFile,
   selectedPageCount,
+  splitLargeConversion,
   unlockDocument,
 } = usePdfImageConverter()
 
@@ -99,6 +109,16 @@ async function handleDrop(event: DragEvent) {
 
 <template>
   <section class="mx-auto grid w-full max-w-7xl gap-5">
+    <ConversionRiskDialog
+      :open="isRiskConfirmationOpen"
+      :estimate="conversionEstimate"
+      :can-reduce-dpi="canReduceDpi"
+      :can-split="canSplitLargeConversion"
+      @continue="continueLargeConversion"
+      @dismiss="dismissRiskConfirmation"
+      @reduce-dpi="reduceConversionDpi"
+      @split="splitLargeConversion"
+    />
     <header class="space-y-1">
       <h1 class="text-2xl font-semibold tracking-tight sm:text-3xl">PDF 轉圖片</h1>
       <p class="text-sm text-muted-foreground">將每一頁轉成 PNG 或 JPG；檔案只在這個瀏覽器分頁內處理。</p>
@@ -210,9 +230,9 @@ async function handleDrop(event: DragEvent) {
         <CardDescription>高 DPI 會產生較大的圖片，也會使用更多瀏覽器記憶體。</CardDescription>
       </CardHeader>
       <CardContent class="grid gap-6 px-4 sm:px-5 lg:grid-cols-2">
-        <SegmentedControl v-model="format" label="圖片格式" :options="formatOptions" />
-        <SegmentedControl v-model="dpi" label="輸出解析度" :options="dpiOptions" />
-        <SegmentedControl v-model="pageSelectionMode" label="頁面" :options="pageSelectionOptions" />
+        <SegmentedControl v-model="format" label="圖片格式" :options="formatOptions" :disabled="isBusy" />
+        <SegmentedControl v-model="dpi" label="輸出解析度" :options="dpiOptions" :disabled="isBusy" />
+        <SegmentedControl v-model="pageSelectionMode" label="頁面" :options="pageSelectionOptions" :disabled="isBusy" />
 
         <div v-if="pageSelectionMode === 'range'" class="grid content-start gap-2">
           <label for="pdf-page-range" class="text-sm font-medium">頁碼範圍</label>
@@ -221,7 +241,7 @@ async function handleDrop(event: DragEvent) {
             v-model="pageRange"
             placeholder="例如 1-3, 5"
             :aria-invalid="Boolean(pageSelectionIssue)"
-            :disabled="documentState !== 'ready'"
+            :disabled="documentState !== 'ready' || isBusy"
           />
           <p v-if="pageSelectionIssue" class="text-xs text-destructive">{{ pageSelectionIssue }}</p>
           <p v-else class="text-xs text-muted-foreground">可使用逗號與連續範圍。</p>
@@ -242,6 +262,7 @@ async function handleDrop(event: DragEvent) {
           label="JPG 品質"
           :min="50"
           :max="100"
+          :disabled="isBusy"
           suffix="%"
         />
       </CardContent>
@@ -256,8 +277,9 @@ async function handleDrop(event: DragEvent) {
             取消
           </Button>
           <Button v-else :disabled="!canConvert" @click="convert">
-            <ImagesIcon />
-            轉換 {{ selectedPageCount }} 頁
+            <LoaderCircleIcon v-if="isPreparingConversion" class="animate-spin" />
+            <ImagesIcon v-else />
+            {{ isPreparingConversion ? '計算轉換規模…' : `轉換 ${selectedPageCount} 頁` }}
           </Button>
         </div>
       </div>
