@@ -20,7 +20,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { ButtonGroup } from '@/components/ui/button-group'
-import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area'
 import { Textarea } from '@/components/ui/textarea'
 import { useJsonEditor } from '@/composables/useJsonEditor'
@@ -151,13 +151,60 @@ function handleFileChange(event: Event) {
       </CardContent>
     </Card>
 
-    <div class="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1fr)_19rem]">
+    <div class="min-w-0">
       <Card class="min-w-0 overflow-hidden">
         <CardHeader class="border-b px-4 pb-4 sm:px-5">
-          <CardTitle>{{ viewMode === 'text' ? 'JSON 內容' : '樹狀內容' }}</CardTitle>
-          <CardDescription>{{ viewMode === 'text' ? '直接編輯原始 JSON。' : '點選 key 或 value 即可修改。' }}</CardDescription>
-          <CardAction><Badge :variant="isValid ? 'default' : 'destructive'">{{ statusLabel }}</Badge></CardAction>
+          <div class="flex flex-wrap items-start justify-between gap-3">
+            <div class="space-y-1">
+              <CardTitle>{{ viewMode === 'text' ? 'JSON 內容' : '樹狀內容' }}</CardTitle>
+              <CardDescription>{{ viewMode === 'text' ? '直接編輯原始 JSON。' : '點選 key 或 value 即可修改。' }}</CardDescription>
+            </div>
+
+            <div class="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
+              <dl class="flex items-center gap-4" aria-label="文件摘要">
+                <div class="flex items-baseline gap-1.5">
+                  <dt class="text-muted-foreground">行數</dt>
+                  <dd class="font-mono font-semibold">{{ stats.lines }}</dd>
+                </div>
+                <div class="flex items-baseline gap-1.5">
+                  <dt class="text-muted-foreground">字元</dt>
+                  <dd class="font-mono font-semibold">{{ stats.characters }}</dd>
+                </div>
+              </dl>
+              <Badge :variant="isValid ? 'default' : 'destructive'">{{ statusLabel }}</Badge>
+            </div>
+          </div>
         </CardHeader>
+
+        <CardContent
+          v-if="issue || canRepair || copyState === 'failed' || fileState === 'failed' || lastAction"
+          class="grid gap-3 border-b bg-muted/20 px-4 sm:px-5"
+        >
+          <Alert v-if="issue" variant="destructive">
+            <BracesIcon />
+            <AlertTitle>{{ issueLocation || '解析失敗' }}</AlertTitle>
+            <AlertDescription>{{ issue.message }}</AlertDescription>
+          </Alert>
+
+          <div v-if="canRepair" class="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-primary/30 bg-primary/5 p-3">
+            <div>
+              <p class="text-sm font-medium">偵測到可修復項目</p>
+              <ul class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                <li v-for="action in repairActions" :key="action.kind">
+                  {{ action.label }}：{{ action.count }} 處
+                </li>
+              </ul>
+            </div>
+            <Button @click="repairJson">
+              <WandSparklesIcon data-icon="inline-start" />
+              自動修復
+            </Button>
+          </div>
+
+          <p v-if="copyState === 'failed'" class="text-sm text-destructive">無法存取剪貼簿，請手動選取內容複製。</p>
+          <p v-if="fileState === 'failed'" class="text-sm text-destructive">無法讀取檔案。</p>
+          <p v-if="lastAction" class="text-sm text-muted-foreground">{{ lastAction }}</p>
+        </CardContent>
 
         <CardContent v-if="viewMode === 'text'" class="px-4 sm:px-5">
           <Textarea
@@ -203,46 +250,6 @@ function handleFileChange(event: Event) {
           </ScrollArea>
         </CardContent>
       </Card>
-
-      <aside class="grid content-start gap-5" aria-label="JSON 狀態">
-        <Card>
-          <CardHeader class="border-b px-4 pb-4">
-            <CardTitle>文件摘要</CardTitle>
-          </CardHeader>
-          <CardContent class="grid gap-4 px-4">
-            <dl class="grid grid-cols-2 gap-3 text-sm">
-              <div class="rounded-lg bg-muted/50 p-3"><dt class="text-muted-foreground">行數</dt><dd class="mt-1 font-mono text-base font-semibold">{{ stats.lines }}</dd></div>
-              <div class="rounded-lg bg-muted/50 p-3"><dt class="text-muted-foreground">字元</dt><dd class="mt-1 font-mono text-base font-semibold">{{ stats.characters }}</dd></div>
-            </dl>
-
-            <Alert v-if="issue" variant="destructive">
-              <BracesIcon />
-              <AlertTitle>{{ issueLocation || '解析失敗' }}</AlertTitle>
-              <AlertDescription>{{ issue.message }}</AlertDescription>
-            </Alert>
-
-            <div v-if="canRepair" class="grid gap-3 rounded-lg border border-primary/30 bg-primary/5 p-3">
-              <div>
-                <p class="text-sm font-medium">偵測到可修復項目</p>
-                <ul class="mt-2 grid gap-1 text-xs text-muted-foreground">
-                  <li v-for="action in repairActions" :key="action.kind" class="flex justify-between gap-3">
-                    <span>{{ action.label }}</span>
-                    <span>{{ action.count }} 處</span>
-                  </li>
-                </ul>
-              </div>
-              <Button @click="repairJson">
-                <WandSparklesIcon data-icon="inline-start" />
-                自動修復
-              </Button>
-            </div>
-
-            <p v-if="copyState === 'failed'" class="text-sm text-destructive">無法存取剪貼簿，請手動選取內容複製。</p>
-            <p v-if="fileState === 'failed'" class="text-sm text-destructive">無法讀取檔案。</p>
-            <p v-if="lastAction" class="rounded-lg bg-muted/50 px-3 py-2 text-sm text-muted-foreground">{{ lastAction }}</p>
-          </CardContent>
-        </Card>
-      </aside>
     </div>
   </section>
 </template>
