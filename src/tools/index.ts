@@ -46,8 +46,12 @@ export const toolCategories: ToolCategoryDefinition[] = [
     label: '編碼與雜湊',
   },
   {
-    id: 'format',
-    label: '格式工具',
+    id: 'data-text',
+    label: '資料與文字',
+  },
+  {
+    id: 'pdf',
+    label: 'PDF 工具',
   },
 ]
 
@@ -81,7 +85,7 @@ export const tools: ToolDefinition[] = [
     path: 'json-editor',
     label: 'JSON 編輯器',
     icon: BracesIcon,
-    categoryId: 'format',
+    categoryId: 'data-text',
     component: JsonEditorView,
   },
   {
@@ -89,7 +93,7 @@ export const tools: ToolDefinition[] = [
     path: 'duplicate-items',
     label: '去除重複項目',
     icon: ListFilterIcon,
-    categoryId: 'format',
+    categoryId: 'data-text',
     component: DuplicateItemsView,
   },
   {
@@ -97,7 +101,7 @@ export const tools: ToolDefinition[] = [
     path: 'json-markdown-table',
     label: 'JSON 轉表格',
     icon: TablePropertiesIcon,
-    categoryId: 'format',
+    categoryId: 'data-text',
     component: JsonMarkdownTableView,
   },
   {
@@ -105,7 +109,7 @@ export const tools: ToolDefinition[] = [
     path: 'csv-table',
     label: 'CSV 表格檢視器',
     icon: FileSpreadsheetIcon,
-    categoryId: 'format',
+    categoryId: 'data-text',
     component: CsvTableView,
   },
   {
@@ -113,7 +117,7 @@ export const tools: ToolDefinition[] = [
     path: 'clipboard-markdown',
     label: '剪貼簿轉 Markdown',
     icon: ClipboardTypeIcon,
-    categoryId: 'format',
+    categoryId: 'data-text',
     component: ClipboardMarkdownView,
   },
   {
@@ -121,7 +125,7 @@ export const tools: ToolDefinition[] = [
     path: 'pdf-image-converter',
     label: 'PDF 轉圖片',
     icon: FileImageIcon,
-    categoryId: 'format',
+    categoryId: 'pdf',
     component: PdfImageConverterView,
   },
   {
@@ -129,7 +133,7 @@ export const tools: ToolDefinition[] = [
     path: 'pdf-watermark',
     label: 'PDF 增加浮水印',
     icon: StampIcon,
-    categoryId: 'format',
+    categoryId: 'pdf',
     component: PdfWatermarkView,
   },
 ]
