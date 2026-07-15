@@ -9,6 +9,7 @@ import {
   ImageIcon,
   LoaderCircleIcon,
   LockKeyholeIcon,
+  RotateCcwIcon,
   ShieldCheckIcon,
   TriangleAlertIcon,
   UploadIcon,
@@ -67,6 +68,7 @@ const {
   progressCompleted,
   progressPercent,
   progressTotal,
+  resetSettings,
   result,
   resultIsStale,
   rotation,
@@ -365,6 +367,18 @@ function removeWatermarkImage() {
               <CardDescription>設定會立即反映在右側近似預覽。</CardDescription>
             </div>
           </div>
+          <CardAction>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              :disabled="generationState === 'running'"
+              @click="resetSettings"
+            >
+              <RotateCcwIcon />
+              重置
+            </Button>
+          </CardAction>
         </CardHeader>
 
         <CardContent class="px-4 sm:px-5">

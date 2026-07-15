@@ -1,4 +1,4 @@
-import { computed, onScopeDispose, ref, shallowRef } from 'vue'
+import { computed, onScopeDispose, ref, shallowRef, watch } from 'vue'
 import type {
   PDFDocumentLoadingTask,
   PDFDocumentProxy,
@@ -43,7 +43,55 @@ const MAX_WATERMARK_IMAGE_PIXELS = 16_777_216
 const MAX_PREVIEW_WIDTH = 1_200
 const MAX_PREVIEW_HEIGHT = 1_600
 const MAX_PREVIEW_PIXELS = 2_000_000
+const STORAGE_KEY = 'hestiakit-pdf-watermark-settings'
 const DEFAULT_WATERMARK_TEXT = '機密文件'
+const DEFAULT_WATERMARK_COLOR = '#b42318'
+const DEFAULT_WATERMARK_LAYOUT: WatermarkLayout = 'center'
+const DEFAULT_OPACITY_PERCENT = 25
+const DEFAULT_ROTATION = -45
+const DEFAULT_SIZE_PERCENT = 45
+
+interface StoredPdfWatermarkSettings {
+  layout?: WatermarkLayout
+  opacityPercent?: number
+  rotation?: number
+  sizePercent?: number
+  watermarkColor?: string
+  watermarkText?: string
+}
+
+function readStoredSettings(): StoredPdfWatermarkSettings {
+  try {
+    const storedSettings = window.localStorage.getItem(STORAGE_KEY)
+    const parsedSettings = storedSettings ? JSON.parse(storedSettings) : undefined
+
+    return parsedSettings && typeof parsedSettings === 'object' ? parsedSettings : {}
+  } catch {
+    return {}
+  }
+}
+
+function writeStoredSettings(settings: StoredPdfWatermarkSettings) {
+  try {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(settings))
+  } catch {
+    // Storage can be unavailable in private or restricted browser contexts.
+  }
+}
+
+function getStoredNumber(
+  value: unknown,
+  fallback: number,
+  minimum: number,
+  maximum: number,
+) {
+  return typeof value === 'number' &&
+    Number.isFinite(value) &&
+    value >= minimum &&
+    value <= maximum
+    ? value
+    : fallback
+}
 
 let pdfJsModulePromise: Promise<PdfJsModule> | undefined
 
@@ -106,6 +154,7 @@ async function createTextWatermarkBlob(text: string, color: string): Promise<Blo
 }
 
 export function usePdfWatermark() {
+  const storedSettings = readStoredSettings()
   const selectedFile = shallowRef<File | null>(null)
   const documentState = ref<DocumentState>('idle')
   const documentMessage = ref('')
@@ -124,8 +173,17 @@ export function usePdfWatermark() {
   const generationMessage = ref('')
   const progressCompleted = ref(0)
   const progressTotal = ref(0)
-  const watermarkText = ref(DEFAULT_WATERMARK_TEXT)
-  const watermarkColor = ref('#b42318')
+  const watermarkText = ref(
+    typeof storedSettings.watermarkText === 'string' && storedSettings.watermarkText.length <= 80
+      ? storedSettings.watermarkText
+      : DEFAULT_WATERMARK_TEXT,
+  )
+  const watermarkColor = ref(
+    typeof storedSettings.watermarkColor === 'string' &&
+      /^#[0-9a-f]{6}$/i.test(storedSettings.watermarkColor)
+      ? storedSettings.watermarkColor
+      : DEFAULT_WATERMARK_COLOR,
+  )
   const watermarkKind = ref<WatermarkKind>('text')
   const watermarkImageFile = shallowRef<File | null>(null)
   const watermarkImageFormat = ref<'png' | 'jpeg' | null>(null)
@@ -133,10 +191,18 @@ export function usePdfWatermark() {
   const watermarkImageMessage = ref('')
   const watermarkImageDimensions = ref<{ height: number; width: number } | null>(null)
   const watermarkImageVersion = ref(0)
-  const layout = ref<WatermarkLayout>('center')
-  const opacityPercent = ref(25)
-  const rotation = ref(-45)
-  const sizePercent = ref(45)
+  const layout = ref<WatermarkLayout>(
+    storedSettings.layout === 'tile' ? 'tile' : DEFAULT_WATERMARK_LAYOUT,
+  )
+  const opacityPercent = ref(
+    getStoredNumber(storedSettings.opacityPercent, DEFAULT_OPACITY_PERCENT, 5, 100),
+  )
+  const rotation = ref(
+    getStoredNumber(storedSettings.rotation, DEFAULT_ROTATION, -180, 180),
+  )
+  const sizePercent = ref(
+    getStoredNumber(storedSettings.sizePercent, DEFAULT_SIZE_PERCENT, 5, 100),
+  )
   const horizontalSpacingPercent = ref(20)
   const verticalSpacingPercent = ref(20)
   const pageSelectionMode = ref<PageSelectionMode>('all')
@@ -252,6 +318,30 @@ export function usePdfWatermark() {
       digitalSignatureState.value !== 'checking' &&
       generationState.value !== 'running',
   )
+
+  watch(
+    [watermarkText, watermarkColor, layout, opacityPercent, sizePercent, rotation],
+    () => {
+      writeStoredSettings({
+        layout: layout.value,
+        opacityPercent: opacityPercent.value,
+        rotation: rotation.value,
+        sizePercent: sizePercent.value,
+        watermarkColor: watermarkColor.value,
+        watermarkText: watermarkText.value,
+      })
+    },
+    { immediate: true },
+  )
+
+  function resetSettings() {
+    watermarkText.value = DEFAULT_WATERMARK_TEXT
+    watermarkColor.value = DEFAULT_WATERMARK_COLOR
+    layout.value = DEFAULT_WATERMARK_LAYOUT
+    opacityPercent.value = DEFAULT_OPACITY_PERCENT
+    sizePercent.value = DEFAULT_SIZE_PERCENT
+    rotation.value = DEFAULT_ROTATION
+  }
 
   let loadingTask: PDFDocumentLoadingTask | null = null
   let pdfDocument: PDFDocumentProxy | null = null
@@ -817,6 +907,7 @@ export function usePdfWatermark() {
     progressCompleted,
     progressPercent,
     progressTotal,
+    resetSettings,
     result,
     resultIsStale,
     rotation,

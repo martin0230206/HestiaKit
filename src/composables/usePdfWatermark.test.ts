@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { effectScope } from 'vue'
+import { effectScope, nextTick } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { usePdfWatermark } from './usePdfWatermark'
 
@@ -78,6 +78,7 @@ function createDeferred<T>() {
 describe('usePdfWatermark', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    window.localStorage.clear()
     MockWorker.instances = []
     vi.stubGlobal('Worker', MockWorker)
     vi.stubGlobal(
@@ -126,6 +127,74 @@ describe('usePdfWatermark', () => {
         numPages: 2,
       }),
     })
+  })
+
+  it('重新開啟工具時恢復上次使用的文字浮水印設定', async () => {
+    const firstScope = effectScope()
+    const firstWatermark = firstScope.run(() => usePdfWatermark())
+
+    expect(firstWatermark).toBeDefined()
+    if (!firstWatermark) return
+
+    firstWatermark.watermarkText.value = '內部使用'
+    firstWatermark.watermarkColor.value = '#371dB9'
+    firstWatermark.layout.value = 'tile'
+    firstWatermark.opacityPercent.value = 27
+    firstWatermark.sizePercent.value = 69
+    firstWatermark.rotation.value = 30
+    await nextTick()
+    firstScope.stop()
+
+    const secondScope = effectScope()
+    const restoredWatermark = secondScope.run(() => usePdfWatermark())
+
+    expect(restoredWatermark?.watermarkText.value).toBe('內部使用')
+    expect(restoredWatermark?.watermarkColor.value).toBe('#371dB9')
+    expect(restoredWatermark?.layout.value).toBe('tile')
+    expect(restoredWatermark?.opacityPercent.value).toBe(27)
+    expect(restoredWatermark?.sizePercent.value).toBe(69)
+    expect(restoredWatermark?.rotation.value).toBe(30)
+
+    secondScope.stop()
+  })
+
+  it('重置浮水印設定並在下次開啟時維持預設值', async () => {
+    const firstScope = effectScope()
+    const watermark = firstScope.run(() => usePdfWatermark())
+
+    expect(watermark).toBeDefined()
+    if (!watermark) return
+
+    watermark.watermarkText.value = '內部使用'
+    watermark.watermarkColor.value = '#371db9'
+    watermark.layout.value = 'tile'
+    watermark.opacityPercent.value = 80
+    watermark.sizePercent.value = 70
+    watermark.rotation.value = 90
+    await nextTick()
+
+    watermark.resetSettings()
+    await nextTick()
+
+    expect(watermark.watermarkText.value).toBe('機密文件')
+    expect(watermark.watermarkColor.value).toBe('#b42318')
+    expect(watermark.layout.value).toBe('center')
+    expect(watermark.opacityPercent.value).toBe(25)
+    expect(watermark.sizePercent.value).toBe(45)
+    expect(watermark.rotation.value).toBe(-45)
+    firstScope.stop()
+
+    const secondScope = effectScope()
+    const restoredWatermark = secondScope.run(() => usePdfWatermark())
+
+    expect(restoredWatermark?.watermarkText.value).toBe('機密文件')
+    expect(restoredWatermark?.watermarkColor.value).toBe('#b42318')
+    expect(restoredWatermark?.layout.value).toBe('center')
+    expect(restoredWatermark?.opacityPercent.value).toBe(25)
+    expect(restoredWatermark?.sizePercent.value).toBe(45)
+    expect(restoredWatermark?.rotation.value).toBe(-45)
+
+    secondScope.stop()
   })
 
   it('產生後提供仍為 PDF 的下載結果', async () => {
