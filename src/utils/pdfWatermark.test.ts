@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   createPdfWatermarkFilename,
   createPdfWatermarkPlacements,
+  hasPdfDigitalSignatureMarker,
   inspectPdfWatermarkImage,
   normalizePdfWatermarkOptions,
   parsePdfWatermarkPageRange,
@@ -116,6 +117,31 @@ describe('pdfWatermark', () => {
         issue: '浮水印圖片必須是有效的 PNG 或 JPEG。',
         ok: false,
       })
+    })
+  })
+
+  describe('hasPdfDigitalSignatureMarker', () => {
+    it.each([
+      '%PDF-1.7\n12 0 obj << /ByteRange [0 100 200 300] >>',
+      '%PDF-1.7\n/TransformMethod /DocMDP',
+    ])('保守辨識原始 PDF 中的簽章標記', (source) => {
+      expect(hasPdfDigitalSignatureMarker(new TextEncoder().encode(source))).toBe(true)
+    })
+
+    it('不把相似但不同的 PDF name 當成簽章標記', () => {
+      const bytes = new TextEncoder().encode(
+        '%PDF-1.7\n/ByteRangeBackup /DocMDPReference',
+      )
+
+      expect(hasPdfDigitalSignatureMarker(bytes)).toBe(false)
+    })
+
+    it('處理 slash 密集的 PDF 內容', () => {
+      const bytes = new TextEncoder().encode(
+        `${'/'.repeat(100_000)}/ByteRange [0 1 2 3]`,
+      )
+
+      expect(hasPdfDigitalSignatureMarker(bytes)).toBe(true)
     })
   })
 

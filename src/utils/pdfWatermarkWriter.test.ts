@@ -2,11 +2,15 @@ import {
   PDFArray,
   PDFDict,
   PDFDocument,
+  PDFHexString,
   PDFName,
   PDFRawStream,
+  PDFString,
+  StandardFonts,
   decodePDFRawStream,
   degrees,
 } from '@pdfme/pdf-lib'
+import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs'
 import { describe, expect, it } from 'vitest'
 import { createPdfWatermarkPlacements } from './pdfWatermark'
 import {
@@ -68,6 +72,62 @@ async function createRotatedCropBoxFixture(): Promise<Uint8Array> {
   return document.save({ useObjectStreams: false })
 }
 
+async function createPreservationFixture(): Promise<Uint8Array> {
+  const document = await PDFDocument.create()
+  const page = document.addPage([612, 792])
+  const font = await document.embedFont(StandardFonts.Helvetica)
+  page.drawText('Original searchable text', {
+    font,
+    size: 18,
+    x: 40,
+    y: 700,
+  })
+
+  const form = document.getForm()
+  const customerName = form.createTextField('customer.name')
+  customerName.setText('Alice')
+  customerName.addToPage(page, {
+    font,
+    height: 24,
+    width: 180,
+    x: 40,
+    y: 640,
+  })
+
+  const note = document.context.register(
+    document.context.obj({
+      Contents: PDFString.of('Keep this note'),
+      Rect: [40, 580, 64, 604],
+      Subtype: 'Text',
+      Type: 'Annot',
+    }),
+  )
+  page.node.addAnnot(note)
+
+  const link = document.context.register(
+    document.context.obj({
+      A: {
+        S: 'URI',
+        Type: 'Action',
+        URI: PDFString.of('https://example.com/preserved'),
+      },
+      Border: [0, 0, 0],
+      Rect: [40, 520, 220, 548],
+      Subtype: 'Link',
+      Type: 'Annot',
+    }),
+  )
+  page.node.addAnnot(link)
+
+  await document.attach(
+    new TextEncoder().encode('preserved attachment'),
+    'evidence.txt',
+    { description: 'Evidence', mimeType: 'text/plain' },
+  )
+
+  return document.save({ useObjectStreams: false })
+}
+
 function countContentStreams(document: PDFDocument, pageIndex: number): number {
   const contents = document.getPage(pageIndex).node.Contents()
   if (!contents) return 0
@@ -121,6 +181,27 @@ function getTranslationMatrices(content: string): Array<{ x: number; y: number }
     x: Number(match[1]),
     y: Number(match[2]),
   }))
+}
+
+async function extractPdfText(bytes: Uint8Array): Promise<string> {
+  const loadingTask = getDocument({
+    data: bytes.slice(),
+    standardFontDataUrl: new URL(
+      '../../node_modules/pdfjs-dist/standard_fonts/',
+      import.meta.url,
+    ).href,
+  })
+  const document = await loadingTask.promise
+
+  try {
+    const page = await document.getPage(1)
+    const content = await page.getTextContent()
+    return content.items
+      .map((item) => ('str' in item ? item.str : ''))
+      .join(' ')
+  } finally {
+    await loadingTask.destroy()
+  }
 }
 
 describe('addPdfWatermark', () => {
@@ -271,6 +352,68 @@ describe('addPdfWatermark', () => {
         ).toBe(true)
       }
     }
+  })
+
+  it('preserves searchable text, forms, annotations, links, and attachments', async () => {
+    const outputBytes = await addPdfWatermark({
+      pdfBytes: await createPreservationFixture(),
+      watermarkBytes: ONE_PIXEL_PNG,
+      watermarkFormat: 'png',
+      selectedPages: [1],
+      options: {
+        layout: 'center',
+        opacity: 0.3,
+        rotation: -45,
+        widthRatio: 0.4,
+      },
+    })
+
+    expect(await extractPdfText(outputBytes)).toContain('Original searchable text')
+
+    const outputDocument = await PDFDocument.load(outputBytes)
+    expect(outputDocument.getForm().getTextField('customer.name').getText()).toBe(
+      'Alice',
+    )
+
+    const annotations = outputDocument.getPage(0).node.Annots()
+    expect(annotations).toBeDefined()
+    const annotationDictionaries = Array.from(
+      { length: annotations?.size() ?? 0 },
+      (_, index) => annotations!.lookup(index, PDFDict),
+    )
+    const note = annotationDictionaries.find(
+      (annotation) => annotation.get(PDFName.of('Subtype'))?.toString() === '/Text',
+    )
+    expect(note?.lookup(PDFName.of('Contents'), PDFString).decodeText()).toBe(
+      'Keep this note',
+    )
+    const link = annotationDictionaries.find(
+      (annotation) => annotation.get(PDFName.of('Subtype'))?.toString() === '/Link',
+    )
+    const action = link?.lookup(PDFName.of('A'), PDFDict)
+    expect(action?.lookup(PDFName.of('URI'), PDFString).decodeText()).toBe(
+      'https://example.com/preserved',
+    )
+
+    const names = outputDocument.catalog.lookup(PDFName.of('Names'), PDFDict)
+    const embeddedFiles = names.lookup(PDFName.of('EmbeddedFiles'), PDFDict)
+    const attachmentNames = embeddedFiles.lookup(PDFName.of('Names'), PDFArray)
+    expect(
+      attachmentNames.lookup(0, PDFString, PDFHexString).decodeText(),
+    ).toBe('evidence.txt')
+    const fileSpecification = attachmentNames.lookup(1, PDFDict)
+    const embeddedFileDictionary = fileSpecification.lookup(
+      PDFName.of('EF'),
+      PDFDict,
+    )
+    const embeddedFile = outputDocument.context.lookup(
+      embeddedFileDictionary.get(PDFName.of('F')),
+    )
+    expect(embeddedFile).toBeInstanceOf(PDFRawStream)
+    if (!(embeddedFile instanceof PDFRawStream)) return
+    expect(
+      new TextDecoder().decode(decodePDFRawStream(embeddedFile).decode()),
+    ).toBe('preserved attachment')
   })
 
   it('rejects encrypted PDFs instead of silently removing protection', async () => {

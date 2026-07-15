@@ -8,6 +8,7 @@ import type {
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
 import {
   createPdfWatermarkFilename,
+  hasPdfDigitalSignatureMarker,
   inspectPdfWatermarkImage,
   parsePdfWatermarkPageRange,
 } from '@/utils/pdfWatermark'
@@ -21,7 +22,13 @@ type PageSelectionMode = 'all' | 'range'
 type WatermarkKind = 'text' | 'image'
 type WatermarkLayout = 'center' | 'tile'
 type PreviewState = 'idle' | 'rendering' | 'ready' | 'failed'
-type DigitalSignatureState = 'idle' | 'checking' | 'none' | 'present' | 'unknown'
+type DigitalSignatureState =
+  | 'idle'
+  | 'checking'
+  | 'none'
+  | 'possible'
+  | 'present'
+  | 'unknown'
 
 export interface PdfWatermarkResult {
   blob: Blob
@@ -369,7 +376,7 @@ export function usePdfWatermark() {
 
   async function detectDigitalSignatures(
     documentProxy: PDFDocumentProxy,
-  ): Promise<Exclude<DigitalSignatureState, 'idle' | 'checking'>> {
+  ): Promise<'none' | 'present' | 'unknown'> {
     try {
       const fields = await documentProxy.getFieldObjects()
       return Object.values(fields ?? {}).some((entries) =>
@@ -545,6 +552,7 @@ export function usePdfWatermark() {
       if (sequence !== loadSequence) return
       const data = new Uint8Array(await file.arrayBuffer())
       if (sequence !== loadSequence) return
+      const hasSignatureMarker = hasPdfDigitalSignatureMarker(data)
 
       const task = pdfjs.getDocument({
         cMapPacked: true,
@@ -568,7 +576,12 @@ export function usePdfWatermark() {
       digitalSignatureState.value = 'checking'
       const signatureState = await detectDigitalSignatures(loadedDocument)
       if (sequence !== loadSequence || pdfDocument !== loadedDocument) return
-      digitalSignatureState.value = signatureState
+      digitalSignatureState.value =
+        signatureState === 'present'
+          ? 'present'
+          : hasSignatureMarker
+            ? 'possible'
+            : signatureState
       documentState.value = 'ready'
       await renderPreview(1)
     } catch (error) {

@@ -529,6 +529,26 @@ describe('usePdfWatermark', () => {
     scope.stop()
   })
 
+  it('沒有 AcroForm Sig 欄位時把 ByteRange 標成可能有簽章而非確定簽署', async () => {
+    const bytes = new TextEncoder().encode(
+      '%PDF-1.7\n12 0 obj << /ByteRange [0 100 200 300] >>',
+    )
+    const scope = effectScope()
+    const watermark = scope.run(() => usePdfWatermark())
+    const file = {
+      arrayBuffer: vi.fn(async () => bytes.slice().buffer),
+      name: '認證文件.pdf',
+      size: bytes.byteLength,
+      type: 'application/pdf',
+    } as unknown as File
+
+    await watermark?.selectFile(file)
+
+    expect(watermark?.digitalSignatureState.value).toBe('possible')
+    expect(watermark?.hasDigitalSignatures.value).toBe(false)
+    scope.stop()
+  })
+
   it('數位簽章掃描完成前禁止產生，掃描失敗則顯示保守狀態', async () => {
     const fieldObjects = createDeferred<null>()
     pdfMocks.getDocument.mockReturnValueOnce({

@@ -68,6 +68,11 @@ const DEFAULT_PDF_WATERMARK_OPTIONS: PdfWatermarkNumericOptions = {
   spacing: 36,
 }
 
+const PDF_DIGITAL_SIGNATURE_MARKERS = [
+  Uint8Array.from([0x2f, 0x42, 0x79, 0x74, 0x65, 0x52, 0x61, 0x6e, 0x67, 0x65]),
+  Uint8Array.from([0x2f, 0x44, 0x6f, 0x63, 0x4d, 0x44, 0x50]),
+]
+
 export function createPdfWatermarkFilename(originalFilename: string): string {
   const withoutExtension = originalFilename.replace(/(?:\.pdf)+$/i, '')
   const sanitized = withoutExtension
@@ -77,6 +82,31 @@ export function createPdfWatermarkFilename(originalFilename: string): string {
   const baseName = sanitized || 'pdf'
 
   return `${baseName}-watermarked.pdf`
+}
+
+export function hasPdfDigitalSignatureMarker(bytes: Uint8Array): boolean {
+  for (let offset = 0; offset < bytes.length; offset += 1) {
+    if (bytes[offset] !== 0x2f) continue
+
+    for (const marker of PDF_DIGITAL_SIGNATURE_MARKERS) {
+      const end = offset + marker.length
+      if (end > bytes.length) continue
+
+      let matches = true
+      for (let index = 0; index < marker.length; index += 1) {
+        if (bytes[offset + index] !== marker[index]) {
+          matches = false
+          break
+        }
+      }
+
+      if (matches && (end === bytes.length || isPdfNameDelimiter(bytes[end] as number))) {
+        return true
+      }
+    }
+  }
+
+  return false
 }
 
 export function inspectPdfWatermarkImage(
@@ -346,6 +376,27 @@ export function parsePdfWatermarkPageRange(
 
 function clampFinite(value: number, min: number, max: number, fallback: number): number {
   return Number.isFinite(value) ? Math.min(max, Math.max(min, value)) : fallback
+}
+
+function isPdfNameDelimiter(value: number): boolean {
+  return (
+    value === 0x00 ||
+    value === 0x09 ||
+    value === 0x0a ||
+    value === 0x0c ||
+    value === 0x0d ||
+    value === 0x20 ||
+    value === 0x25 ||
+    value === 0x28 ||
+    value === 0x29 ||
+    value === 0x2f ||
+    value === 0x3c ||
+    value === 0x3e ||
+    value === 0x5b ||
+    value === 0x5d ||
+    value === 0x7b ||
+    value === 0x7d
+  )
 }
 
 function createImageInspectionResult(

@@ -335,6 +335,14 @@ function removeWatermarkImage() {
           </AlertDescription>
         </Alert>
 
+        <Alert v-else-if="digitalSignatureState === 'possible'" variant="destructive">
+          <TriangleAlertIcon />
+          <AlertTitle>這份 PDF 可能含有數位簽章</AlertTitle>
+          <AlertDescription>
+            偵測到 ByteRange 或 DocMDP 簽章標記，但無法確認完整簽章欄位。加入浮水印後，原有簽章可能失效或顯示文件已變更。
+          </AlertDescription>
+        </Alert>
+
         <Alert v-else-if="digitalSignatureState === 'unknown'" variant="destructive">
           <TriangleAlertIcon />
           <AlertTitle>無法確認這份 PDF 的簽章狀態</AlertTitle>
