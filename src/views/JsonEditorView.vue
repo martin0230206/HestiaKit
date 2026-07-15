@@ -4,6 +4,7 @@ import {
   ArrowDownAZIcon,
   BracesIcon,
   CheckIcon,
+  CircleAlertIcon,
   ClipboardIcon,
   DownloadIcon,
   FileTextIcon,
@@ -14,9 +15,10 @@ import {
   UnfoldVerticalIcon,
   UploadIcon,
   WandSparklesIcon,
+  XIcon,
 } from '@lucide/vue'
 import JsonTreeNode from '@/components/json-editor/JsonTreeNode.vue'
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { Alert, AlertAction, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { ButtonGroup } from '@/components/ui/button-group'
@@ -34,16 +36,17 @@ const {
   copyJson,
   copyState,
   deleteTreeItem,
+  dismissLastAction,
   downloadJson,
   expandTree,
   expandedPaths,
-  fileState,
   formatJson,
   importFile,
   isValid,
   issue,
   issueLocation,
   lastAction,
+  lastActionVariant,
   loadSample,
   repairActions,
   repairJson,
@@ -177,7 +180,7 @@ function handleFileChange(event: Event) {
         </CardHeader>
 
         <CardContent
-          v-if="issue || canRepair || copyState === 'failed' || fileState === 'failed' || lastAction"
+          v-if="issue || canRepair"
           class="grid gap-3 border-b bg-muted/20 px-4 sm:px-5"
         >
           <Alert v-if="issue" variant="destructive">
@@ -200,10 +203,6 @@ function handleFileChange(event: Event) {
               自動修復
             </Button>
           </div>
-
-          <p v-if="copyState === 'failed'" class="text-sm text-destructive">無法存取剪貼簿，請手動選取內容複製。</p>
-          <p v-if="fileState === 'failed'" class="text-sm text-destructive">無法讀取檔案。</p>
-          <p v-if="lastAction" class="text-sm text-muted-foreground">{{ lastAction }}</p>
         </CardContent>
 
         <CardContent v-if="viewMode === 'text'" class="px-4 sm:px-5">
@@ -251,5 +250,28 @@ function handleFileChange(event: Event) {
         </CardContent>
       </Card>
     </div>
+
+    <Transition
+      enter-active-class="transition duration-200 ease-out"
+      enter-from-class="translate-y-2 opacity-0"
+      leave-active-class="transition duration-150 ease-in"
+      leave-to-class="translate-y-2 opacity-0"
+    >
+      <Alert
+        v-if="lastAction"
+        :variant="lastActionVariant"
+        class="fixed right-4 bottom-4 z-50 w-[min(calc(100vw-2rem),24rem)] shadow-lg sm:right-6 sm:bottom-6"
+      >
+        <CircleAlertIcon v-if="lastActionVariant === 'destructive'" />
+        <CheckIcon v-else />
+        <AlertTitle>{{ lastActionVariant === 'destructive' ? '操作失敗' : '操作完成' }}</AlertTitle>
+        <AlertDescription>{{ lastAction }}</AlertDescription>
+        <AlertAction>
+          <Button variant="ghost" size="icon-sm" aria-label="關閉通知" @click="dismissLastAction">
+            <XIcon />
+          </Button>
+        </AlertAction>
+      </Alert>
+    </Transition>
   </section>
 </template>

@@ -1,4 +1,4 @@
-﻿import { computed, ref, watch } from 'vue'
+﻿import { computed, onScopeDispose, ref, watch } from 'vue'
 import {
   addJsonDocumentItem,
   collectExpandableJsonPaths,
@@ -18,6 +18,9 @@ import {
 const storageKey = 'hestiakit-json-editor'
 
 export type JsonEditorViewMode = 'text' | 'tree'
+type JsonEditorActionVariant = 'default' | 'destructive'
+
+const actionNoticeDuration = 3000
 
 const sampleJson = JSON.stringify(
   {
@@ -98,6 +101,8 @@ export function useJsonEditor() {
   const copyState = ref<'idle' | 'copied' | 'failed'>('idle')
   const fileState = ref<'idle' | 'loaded' | 'failed'>('idle')
   const lastAction = ref('')
+  const lastActionVariant = ref<JsonEditorActionVariant>('default')
+  let lastActionTimer: ReturnType<typeof setTimeout> | undefined
 
   const parseResult = computed(() => parseJsonDocument(source.value))
   const treeValue = computed(() => (parseResult.value.ok ? parseResult.value.value : undefined))
@@ -125,16 +130,38 @@ export function useJsonEditor() {
     return `第 ${issue.value.line} 行，第 ${issue.value.column} 欄`
   })
 
+  function dismissLastAction() {
+    if (lastActionTimer) {
+      clearTimeout(lastActionTimer)
+      lastActionTimer = undefined
+    }
+
+    lastAction.value = ''
+  }
+
+  function showLastAction(message: string, variant: JsonEditorActionVariant = 'default') {
+    if (lastActionTimer) {
+      clearTimeout(lastActionTimer)
+    }
+
+    lastAction.value = message
+    lastActionVariant.value = variant
+    lastActionTimer = setTimeout(() => {
+      lastAction.value = ''
+      lastActionTimer = undefined
+    }, actionNoticeDuration)
+  }
+
   function applyTransform(result: JsonTransformResult, successMessage: string) {
     copyState.value = 'idle'
 
     if (!result.ok || result.output === undefined) {
-      lastAction.value = result.issue?.message ?? '無法處理 JSON。'
+      showLastAction(result.issue?.message ?? '無法處理 JSON。', 'destructive')
       return
     }
 
     source.value = result.output
-    lastAction.value = successMessage
+    showLastAction(successMessage)
   }
 
   function formatJson() {
@@ -153,14 +180,14 @@ export function useJsonEditor() {
     copyState.value = 'idle'
 
     if (!canRepair.value || repairResult.value.output === undefined) {
-      lastAction.value = '沒有可自動修復的常見 JSON 錯誤。'
+      showLastAction('沒有可自動修復的常見 JSON 錯誤。', 'destructive')
       return
     }
 
     const repairedCount = repairResult.value.actions.reduce((total, action) => total + action.count, 0)
 
     source.value = repairResult.value.output
-    lastAction.value = `已自動修復 ${repairedCount} 處常見錯誤`
+    showLastAction(`已自動修復 ${repairedCount} 處常見錯誤`)
   }
 
   function updateTreeKey(path: string, nextKey: string) {
@@ -237,14 +264,14 @@ export function useJsonEditor() {
     source.value = sampleJson
     copyState.value = 'idle'
     fileState.value = 'idle'
-    lastAction.value = '已載入範例'
+    showLastAction('已載入範例')
   }
 
   function clearJson() {
     source.value = ''
     copyState.value = 'idle'
     fileState.value = 'idle'
-    lastAction.value = '已清空'
+    showLastAction('已清空')
   }
 
   async function copyJson() {
@@ -253,6 +280,7 @@ export function useJsonEditor() {
       copyState.value = 'copied'
     } catch {
       copyState.value = 'failed'
+      showLastAction('無法存取剪貼簿，請手動選取內容複製。', 'destructive')
     }
   }
 
@@ -261,17 +289,23 @@ export function useJsonEditor() {
       source.value = await file.text()
       fileState.value = 'loaded'
       copyState.value = 'idle'
-      lastAction.value = `已開啟 ${file.name}`
+      showLastAction(`已開啟 ${file.name}`)
     } catch {
       fileState.value = 'failed'
-      lastAction.value = '無法讀取檔案。'
+      showLastAction('無法讀取檔案。', 'destructive')
     }
   }
 
   function downloadJson() {
     downloadText('hestiakit.json', source.value)
-    lastAction.value = '已下載'
+    showLastAction('已下載')
   }
+
+  onScopeDispose(() => {
+    if (lastActionTimer) {
+      clearTimeout(lastActionTimer)
+    }
+  })
 
   watch(
     [source, viewMode],
@@ -310,6 +344,7 @@ export function useJsonEditor() {
     compactJson,
     copyJson,
     copyState,
+    dismissLastAction,
     addTreeItem,
     canRepair,
     deleteTreeItem,
@@ -323,6 +358,7 @@ export function useJsonEditor() {
     issue,
     issueLocation,
     lastAction,
+    lastActionVariant,
     loadSample,
     repairActions,
     repairJson,
