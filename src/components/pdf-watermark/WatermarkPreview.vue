@@ -16,6 +16,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
+import { normalizePdfWatermarkText } from '@/utils/pdfWatermark'
 
 type PreviewState = 'idle' | 'rendering' | 'ready' | 'failed'
 type WatermarkKind = 'text' | 'image'
@@ -57,7 +58,8 @@ const previewAspectRatio = computed(() => props.previewAspectRatio ?? 1 / Math.s
 const previewPageStyle = computed<CSSProperties>(() => ({
   aspectRatio: String(previewAspectRatio.value),
 }))
-const watermarkTextContent = computed(() => props.watermarkText.trim())
+const watermarkTextLayout = computed(() => normalizePdfWatermarkText(props.watermarkText))
+const watermarkTextContent = computed(() => watermarkTextLayout.value.text)
 const hasWatermarkContent = computed(() =>
   props.watermarkKind === 'text'
     ? watermarkTextContent.value.length > 0
@@ -72,15 +74,20 @@ const shouldShowWatermark = computed(
     props.isPreviewPageSelected &&
     hasWatermarkContent.value,
 )
-const textCharacterCount = computed(() => Math.max(1, [...watermarkTextContent.value].length))
+const longestLineCharacterCount = computed(() =>
+  Math.max(1, watermarkTextLayout.value.longestLineCharacterCount),
+)
 const centeredTextFontSize = computed(() =>
-  clamp(normalizedSize.value / textCharacterCount.value, 1.2, 18),
+  clamp(normalizedSize.value / longestLineCharacterCount.value, 1.2, 18),
 )
 const centeredTextStyle = computed<CSSProperties>(() => ({
   color: props.watermarkColor,
   fontSize: `${centeredTextFontSize.value}cqw`,
+  lineHeight: 1.2,
   opacity: normalizedOpacity.value,
+  textAlign: 'center',
   transform: `translate(-50%, -50%) rotate(${previewRotation.value}deg)`,
+  whiteSpace: 'pre',
 }))
 const centeredImageStyle = computed<CSSProperties>(() => ({
   opacity: normalizedOpacity.value,
@@ -106,8 +113,11 @@ const tileGridStyle = computed<CSSProperties>(() => ({
 const tiledTextStyle = computed<CSSProperties>(() => ({
   color: props.watermarkColor,
   fontSize: `${clamp(centeredTextFontSize.value / Math.max(1, tileColumnCount.value - 1), 0.8, 7)}cqw`,
+  lineHeight: 1.2,
   opacity: normalizedOpacity.value,
+  textAlign: 'center',
   transform: `rotate(${previewRotation.value}deg)`,
+  whiteSpace: 'pre',
 }))
 const tiledImageStyle = computed<CSSProperties>(() => ({
   opacity: normalizedOpacity.value,
@@ -118,7 +128,7 @@ const tiledImageStyle = computed<CSSProperties>(() => ({
 const previewSummary = computed(() => {
   const watermark =
     props.watermarkKind === 'text'
-      ? `文字浮水印「${watermarkTextContent.value || '尚未輸入'}」`
+      ? `文字浮水印「${watermarkTextLayout.value.lines.join('／') || '尚未輸入'}」`
       : props.watermarkImageUrl
         ? '圖片浮水印'
         : '尚未選擇浮水印圖片'
@@ -248,7 +258,7 @@ function goToNextPage() {
             >
               <span
                 v-if="watermarkKind === 'text'"
-                class="absolute left-1/2 top-1/2 max-w-none whitespace-nowrap font-bold leading-none"
+                class="absolute left-1/2 top-1/2 max-w-none font-bold"
                 :style="centeredTextStyle"
               >
                 {{ watermarkTextContent }}
@@ -275,7 +285,7 @@ function goToNextPage() {
               >
                 <span
                   v-if="watermarkKind === 'text'"
-                  class="max-w-none whitespace-nowrap font-bold leading-none"
+                  class="max-w-none font-bold"
                   :style="tiledTextStyle"
                 >
                   {{ watermarkTextContent }}

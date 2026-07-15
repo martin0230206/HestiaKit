@@ -31,8 +31,13 @@ import {
   CardTitle,
 } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import { usePdfWatermark } from '@/composables/usePdfWatermark'
 import { formatPdfFileSize } from '@/utils/pdfImageConverter'
+import {
+  PDF_WATERMARK_TEXT_MAX_CHARACTERS,
+  PDF_WATERMARK_TEXT_MAX_LINES,
+} from '@/utils/pdfWatermark'
 
 const fileInput = ref<HTMLInputElement | null>(null)
 const watermarkImageInput = ref<HTMLInputElement | null>(null)
@@ -88,6 +93,9 @@ const {
   watermarkImageUrl,
   watermarkKind,
   watermarkText,
+  watermarkTextCharacterCount,
+  watermarkTextIssue,
+  watermarkTextLineCount,
 } = usePdfWatermark()
 
 const watermarkKindOptions: Array<{ label: string; value: 'text' | 'image' }> = [
@@ -395,13 +403,34 @@ function removeWatermarkImage() {
             <div v-if="watermarkKind === 'text'" class="grid gap-4">
               <label class="grid gap-2 text-sm font-medium" for="pdf-watermark-text">
                 浮水印文字
-                <Input
+                <Textarea
                   id="pdf-watermark-text"
                   v-model="watermarkText"
-                  maxlength="80"
-                  placeholder="例如：機密文件"
+                  rows="3"
+                  class="min-h-24 resize-y leading-relaxed"
+                  placeholder="例如：機密文件&#10;僅供內部使用&#10;2026-07-15"
                   :disabled="settingsDisabled"
+                  :aria-invalid="watermarkTextIssue ? 'true' : undefined"
+                  aria-describedby="pdf-watermark-text-help pdf-watermark-text-count"
                 />
+                <span
+                  id="pdf-watermark-text-help"
+                  class="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-xs font-normal text-muted-foreground"
+                >
+                  <span>
+                    最多 {{ PDF_WATERMARK_TEXT_MAX_LINES }} 行、共
+                    {{ PDF_WATERMARK_TEXT_MAX_CHARACTERS }} 個字元；每行置中對齊。
+                  </span>
+                  <output
+                    id="pdf-watermark-text-count"
+                    for="pdf-watermark-text"
+                    class="tabular-nums"
+                    :class="watermarkTextIssue ? 'text-destructive' : ''"
+                  >
+                    {{ watermarkTextCharacterCount }} / {{ PDF_WATERMARK_TEXT_MAX_CHARACTERS }} 字 ·
+                    {{ watermarkTextLineCount }} / {{ PDF_WATERMARK_TEXT_MAX_LINES }} 行
+                  </output>
+                </span>
               </label>
 
               <div class="grid gap-2">

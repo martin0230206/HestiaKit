@@ -5,6 +5,39 @@ import { describe, expect, it } from 'vitest'
 import WatermarkPreview from './WatermarkPreview.vue'
 
 describe('WatermarkPreview', () => {
+  it('將三行文字保留為同一個逐行置中的浮水印區塊', () => {
+    const wrapper = mount(WatermarkPreview, {
+      props: {
+        isPreviewPageSelected: true,
+        horizontalSpacingPercent: 20,
+        layout: 'center',
+        opacityPercent: 25,
+        pageCount: 1,
+        previewAspectRatio: 612 / 792,
+        previewBaseUrl: 'blob:preview',
+        previewMessage: '',
+        previewPageNumber: 1,
+        previewState: 'ready',
+        rotation: -45,
+        sizePercent: 45,
+        verticalSpacingPercent: 30,
+        watermarkColor: '#b42318',
+        watermarkImageUrl: '',
+        watermarkKind: 'text',
+        watermarkText: '機密文件\r\n僅供內部使用\r\n2026-07-15',
+      },
+    })
+
+    const textBlock = wrapper.get('span.font-bold')
+    const style = textBlock.attributes('style')
+
+    expect(textBlock.text()).toBe('機密文件\n僅供內部使用\n2026-07-15')
+    expect(style).toContain('font-size: 4.5cqw')
+    expect(style).toContain('line-height: 1.2')
+    expect(style).toContain('text-align: center')
+    expect(style).toContain('white-space: pre')
+  })
+
   it('補償 CSS 與 PDF 的 Y 軸方向，讓預覽角度符合輸出', () => {
     const wrapper = mount(WatermarkPreview, {
       props: {
@@ -86,5 +119,36 @@ describe('WatermarkPreview', () => {
       .find((element) => element.attributes('style')?.includes('grid-template-columns'))
     expect(tileGrid?.attributes('style')).toContain('column-gap: 1.3%')
     expect(tileGrid?.attributes('style')).toContain('row-gap: 1.7%')
+  })
+
+  it('平鋪時把完整三行文字區塊視為同一個浮水印單位', () => {
+    const wrapper = mount(WatermarkPreview, {
+      props: {
+        horizontalSpacingPercent: 20,
+        isPreviewPageSelected: true,
+        layout: 'tile',
+        opacityPercent: 25,
+        pageCount: 1,
+        previewAspectRatio: 612 / 792,
+        previewBaseUrl: 'blob:preview',
+        previewMessage: '',
+        previewPageNumber: 1,
+        previewState: 'ready',
+        rotation: -45,
+        sizePercent: 45,
+        verticalSpacingPercent: 30,
+        watermarkColor: '#b42318',
+        watermarkImageUrl: '',
+        watermarkKind: 'text',
+        watermarkText: '機密文件\n僅供內部使用\n2026-07-15',
+      },
+    })
+
+    const textBlocks = wrapper.findAll('span.font-bold')
+
+    expect(textBlocks.length).toBeGreaterThan(1)
+    expect(textBlocks.every((block) => block.text() === '機密文件\n僅供內部使用\n2026-07-15')).toBe(true)
+    expect(textBlocks[0]?.attributes('style')).toContain('text-align: center')
+    expect(textBlocks[0]?.attributes('style')).toContain('white-space: pre')
   })
 })

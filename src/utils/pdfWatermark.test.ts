@@ -4,11 +4,74 @@ import {
   createPdfWatermarkPlacements,
   hasPdfDigitalSignatureMarker,
   inspectPdfWatermarkImage,
+  getPdfWatermarkTextIssue,
+  normalizePdfWatermarkText,
   normalizePdfWatermarkOptions,
   parsePdfWatermarkPageRange,
 } from './pdfWatermark'
 
 describe('pdfWatermark', () => {
+  describe('normalizePdfWatermarkText', () => {
+    it('正規化換行與外圍空白，並保留三行逐行置中的文字內容', () => {
+      expect(
+        normalizePdfWatermarkText(
+          '  \r\n  機密文件  \r\n僅供內部使用\r\n  2026-07-15  \r\n ',
+        ),
+      ).toEqual({
+        characterCount: 20,
+        lineCount: 3,
+        lines: ['機密文件', '僅供內部使用', '2026-07-15'],
+        longestLineCharacterCount: 10,
+        text: '機密文件\n僅供內部使用\n2026-07-15',
+      })
+    })
+
+    it('限制最多三行與 80 個 Unicode 字元', () => {
+      expect(getPdfWatermarkTextIssue('第一行\n第二行\n第三行\n第四行')).toBe(
+        '文字浮水印最多 3 行。',
+      )
+      expect(getPdfWatermarkTextIssue('😀'.repeat(80))).toBe('')
+      expect(
+        getPdfWatermarkTextIssue(
+          `${'甲'.repeat(30)}\n${'乙'.repeat(30)}\n${'丙'.repeat(20)}`,
+        ),
+      ).toBe('')
+      expect(getPdfWatermarkTextIssue('😀'.repeat(81))).toBe(
+        '文字浮水印最多 80 個字元。',
+      )
+    })
+
+    it('以使用者看見的字形單位計算組合字與 Emoji', () => {
+      const familyEmoji = '👨‍👩‍👧‍👦'
+      const combinedCharacter = 'é'
+      const layout = normalizePdfWatermarkText(
+        `${familyEmoji.repeat(40)}\n${combinedCharacter.repeat(40)}`,
+      )
+
+      expect(layout.characterCount).toBe(80)
+      expect(layout.longestLineCharacterCount).toBe(40)
+      expect(getPdfWatermarkTextIssue(layout.text)).toBe('')
+      expect(getPdfWatermarkTextIssue(familyEmoji.repeat(81))).toBe(
+        '文字浮水印最多 80 個字元。',
+      )
+    })
+
+    it('保留內部空行作為多行區塊的垂直間距', () => {
+      expect(normalizePdfWatermarkText('第一行\n\n第三行')).toMatchObject({
+        lineCount: 3,
+        lines: ['第一行', '', '第三行'],
+        text: '第一行\n\n第三行',
+      })
+    })
+
+    it('以線性流程處理大量換行的程式化輸入', () => {
+      const manyLines = `${'x\n'.repeat(150_000)}x`
+
+      expect(getPdfWatermarkTextIssue(manyLines)).toBe('文字浮水印最多 3 行。')
+      expect(normalizePdfWatermarkText(`${'\n'.repeat(150_000)}內容`).text).toBe('內容')
+    })
+  })
+
   describe('parsePdfWatermarkPageRange', () => {
     it('parses ranges, removes duplicates, and sorts selected pages', () => {
       expect(parsePdfWatermarkPageRange('5, 1-3, 3', 6)).toEqual({

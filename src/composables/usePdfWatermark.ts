@@ -8,8 +8,10 @@ import type {
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
 import {
   createPdfWatermarkFilename,
+  getPdfWatermarkTextIssue,
   hasPdfDigitalSignatureMarker,
   inspectPdfWatermarkImage,
+  normalizePdfWatermarkText,
   parsePdfWatermarkPageRange,
 } from '@/utils/pdfWatermark'
 import type { PdfWatermarkWorkerResponse } from '@/workers/pdfWatermark.worker'
@@ -128,22 +130,40 @@ async function createTextWatermarkBlob(text: string, color: string): Promise<Blo
   }
 
   const fontSize = 160
+  const lineHeight = fontSize * 1.2
   const horizontalPadding = 80
   const verticalPadding = 48
+  const lines = normalizePdfWatermarkText(text).lines
+  if (lines.length === 0) {
+    throw new Error('文字浮水印不可為空白。')
+  }
+
   context.font = `700 ${fontSize}px system-ui, sans-serif`
-  const metrics = context.measureText(text)
-  canvas.width = Math.min(4_096, Math.max(1, Math.ceil(metrics.width + horizontalPadding * 2)))
-  canvas.height = Math.ceil(fontSize + verticalPadding * 2)
+  const contentWidth = lines.reduce(
+    (widest, line) => Math.max(widest, context.measureText(line).width),
+    0,
+  )
+  const contentHeight = fontSize + (lines.length - 1) * lineHeight
+  canvas.width = Math.min(
+    4_096,
+    Math.max(1, Math.ceil(contentWidth + horizontalPadding * 2)),
+  )
+  canvas.height = Math.ceil(contentHeight + verticalPadding * 2)
 
   context.font = `700 ${fontSize}px system-ui, sans-serif`
   context.fillStyle = color
+  context.textAlign = 'center'
   context.textBaseline = 'middle'
-  context.fillText(
-    text,
-    horizontalPadding,
-    canvas.height / 2,
-    canvas.width - horizontalPadding * 2,
-  )
+  const centerX = canvas.width / 2
+  const maxLineWidth = canvas.width - horizontalPadding * 2
+  lines.forEach((line, index) => {
+    context.fillText(
+      line,
+      centerX,
+      verticalPadding + fontSize / 2 + index * lineHeight,
+      maxLineWidth,
+    )
+  })
 
   try {
     return await canvasToPngBlob(canvas)
@@ -155,6 +175,10 @@ async function createTextWatermarkBlob(text: string, color: string): Promise<Blo
 
 export function usePdfWatermark() {
   const storedSettings = readStoredSettings()
+  const storedWatermarkText =
+    typeof storedSettings.watermarkText === 'string'
+      ? normalizePdfWatermarkText(storedSettings.watermarkText)
+      : null
   const selectedFile = shallowRef<File | null>(null)
   const documentState = ref<DocumentState>('idle')
   const documentMessage = ref('')
@@ -174,8 +198,8 @@ export function usePdfWatermark() {
   const progressCompleted = ref(0)
   const progressTotal = ref(0)
   const watermarkText = ref(
-    typeof storedSettings.watermarkText === 'string' && storedSettings.watermarkText.length <= 80
-      ? storedSettings.watermarkText
+    storedWatermarkText && getPdfWatermarkTextIssue(storedWatermarkText.text) === ''
+      ? storedWatermarkText.text
       : DEFAULT_WATERMARK_TEXT,
   )
   const watermarkColor = ref(
@@ -240,9 +264,15 @@ export function usePdfWatermark() {
   const pageSelectionIssue = computed(() => pageSelectionResult.value.issue)
   const selectedPages = computed(() => pageSelectionResult.value.pages)
   const selectedPageCount = computed(() => selectedPages.value.length)
+  const watermarkTextLayout = computed(() => normalizePdfWatermarkText(watermarkText.value))
+  const watermarkTextCharacterCount = computed(
+    () => watermarkTextLayout.value.characterCount,
+  )
+  const watermarkTextLineCount = computed(() => watermarkTextLayout.value.lineCount)
+  const watermarkTextIssue = computed(() => getPdfWatermarkTextIssue(watermarkText.value))
   const settingsIssue = computed(() => {
-    if (watermarkKind.value === 'text' && watermarkText.value.length > 80) {
-      return '文字浮水印最多 80 個字元。'
+    if (watermarkKind.value === 'text' && watermarkTextIssue.value) {
+      return watermarkTextIssue.value
     }
     if (watermarkKind.value === 'text' && !/^#[0-9a-f]{6}$/i.test(watermarkColor.value)) {
       return '文字顏色格式無效。'
@@ -295,7 +325,7 @@ export function usePdfWatermark() {
       rotation: rotation.value,
       size: sizePercent.value,
       horizontalSpacing: horizontalSpacingPercent.value,
-      text: watermarkText.value,
+      text: watermarkTextLayout.value.text,
       verticalSpacing: verticalSpacingPercent.value,
     }),
   )
@@ -311,7 +341,7 @@ export function usePdfWatermark() {
     () =>
       documentState.value === 'ready' &&
       (watermarkKind.value === 'text'
-        ? watermarkText.value.trim().length > 0
+        ? watermarkTextLayout.value.text.length > 0
         : watermarkImageFile.value !== null && watermarkImageFormat.value !== null) &&
       selectedPages.value.length > 0 &&
       settingsIssue.value === '' &&
@@ -710,7 +740,7 @@ export function usePdfWatermark() {
       const watermarkBlob =
         watermarkKind.value === 'text'
           ? await createTextWatermarkBlob(
-              watermarkText.value.trim(),
+              watermarkTextLayout.value.text,
               watermarkColor.value,
             )
           : watermarkImageFile.value
@@ -927,5 +957,8 @@ export function usePdfWatermark() {
     watermarkImageUrl,
     watermarkKind,
     watermarkText,
+    watermarkTextCharacterCount,
+    watermarkTextIssue,
+    watermarkTextLineCount,
   }
 }

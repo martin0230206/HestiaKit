@@ -21,6 +21,14 @@ export interface PdfWatermarkSize {
   width: number
 }
 
+export interface PdfWatermarkTextLayout {
+  characterCount: number
+  lineCount: number
+  lines: string[]
+  longestLineCharacterCount: number
+  text: string
+}
+
 export type PdfWatermarkPageRotation = 0 | 90 | 180 | 270
 
 export type PdfWatermarkImageInspectionResult =
@@ -61,6 +69,14 @@ export type CreatePdfWatermarkPlacementsOptions =
   | CreateCenteredPdfWatermarkPlacementsOptions
   | CreateTiledPdfWatermarkPlacementsOptions
 
+export const PDF_WATERMARK_TEXT_MAX_CHARACTERS = 80
+export const PDF_WATERMARK_TEXT_MAX_LINES = 3
+
+const PDF_WATERMARK_GRAPHEME_SEGMENTER =
+  typeof Intl.Segmenter === 'function'
+    ? new Intl.Segmenter(undefined, { granularity: 'grapheme' })
+    : null
+
 const DEFAULT_PDF_WATERMARK_OPTIONS: PdfWatermarkNumericOptions = {
   angle: -45,
   opacity: 0.25,
@@ -82,6 +98,57 @@ export function createPdfWatermarkFilename(originalFilename: string): string {
   const baseName = sanitized || 'pdf'
 
   return `${baseName}-watermarked.pdf`
+}
+
+function countPdfWatermarkTextCharacters(value: string): number {
+  if (!PDF_WATERMARK_GRAPHEME_SEGMENTER) {
+    return [...value].length
+  }
+
+  return Array.from(PDF_WATERMARK_GRAPHEME_SEGMENTER.segment(value)).length
+}
+
+export function normalizePdfWatermarkText(input: string): PdfWatermarkTextLayout {
+  const inputLines = input
+    .replace(/\r\n?/g, '\n')
+    .split('\n')
+    .map((line) => line.trim())
+  let firstContentLine = 0
+  let lastContentLine = inputLines.length
+
+  while (firstContentLine < lastContentLine && inputLines[firstContentLine] === '') {
+    firstContentLine += 1
+  }
+  while (lastContentLine > firstContentLine && inputLines[lastContentLine - 1] === '') {
+    lastContentLine -= 1
+  }
+
+  const lines = inputLines.slice(firstContentLine, lastContentLine)
+  const lineCharacterCounts = lines.map(countPdfWatermarkTextCharacters)
+
+  return {
+    characterCount: lineCharacterCounts.reduce((total, count) => total + count, 0),
+    lineCount: lines.length,
+    lines,
+    longestLineCharacterCount: lineCharacterCounts.reduce(
+      (longest, count) => Math.max(longest, count),
+      0,
+    ),
+    text: lines.join('\n'),
+  }
+}
+
+export function getPdfWatermarkTextIssue(input: string): string {
+  const layout = normalizePdfWatermarkText(input)
+
+  if (layout.lineCount > PDF_WATERMARK_TEXT_MAX_LINES) {
+    return `文字浮水印最多 ${PDF_WATERMARK_TEXT_MAX_LINES} 行。`
+  }
+  if (layout.characterCount > PDF_WATERMARK_TEXT_MAX_CHARACTERS) {
+    return `文字浮水印最多 ${PDF_WATERMARK_TEXT_MAX_CHARACTERS} 個字元。`
+  }
+
+  return ''
 }
 
 export function hasPdfDigitalSignatureMarker(bytes: Uint8Array): boolean {

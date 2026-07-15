@@ -75,6 +75,19 @@ function createDeferred<T>() {
   return { promise, reject, resolve }
 }
 
+const canvasContextMock = {
+  fillStyle: '',
+  fillText: vi.fn(),
+  font: '',
+  measureText: vi.fn(() => ({
+    actualBoundingBoxAscent: 64,
+    actualBoundingBoxDescent: 16,
+    width: 320,
+  })),
+  textAlign: 'start',
+  textBaseline: 'alphabetic',
+}
+
 describe('usePdfWatermark', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -94,17 +107,13 @@ describe('usePdfWatermark', () => {
       configurable: true,
       value: vi.fn(),
     })
-    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
-      fillStyle: '',
-      fillText: vi.fn(),
-      font: '',
-      measureText: vi.fn(() => ({
-        actualBoundingBoxAscent: 64,
-        actualBoundingBoxDescent: 16,
-        width: 320,
-      })),
-      textBaseline: 'alphabetic',
-    } as unknown as CanvasRenderingContext2D)
+    canvasContextMock.fillStyle = ''
+    canvasContextMock.font = ''
+    canvasContextMock.textAlign = 'start'
+    canvasContextMock.textBaseline = 'alphabetic'
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(
+      canvasContextMock as unknown as CanvasRenderingContext2D,
+    )
     vi.spyOn(HTMLCanvasElement.prototype, 'toBlob').mockImplementation((callback) => {
       callback(new Blob(['png'], { type: 'image/png' }))
     })
@@ -158,6 +167,30 @@ describe('usePdfWatermark', () => {
     secondScope.stop()
   })
 
+  it('從本機設定恢復時正規化多行文字並拒絕超過三行的舊值', () => {
+    window.localStorage.setItem(
+      'hestiakit-pdf-watermark-settings',
+      JSON.stringify({ watermarkText: '\r\n  機密文件  \r\n僅供內部使用\r\n2026-07-15\r\n' }),
+    )
+    const validScope = effectScope()
+    const validWatermark = validScope.run(() => usePdfWatermark())
+
+    expect(validWatermark?.watermarkText.value).toBe(
+      '機密文件\n僅供內部使用\n2026-07-15',
+    )
+    validScope.stop()
+
+    window.localStorage.setItem(
+      'hestiakit-pdf-watermark-settings',
+      JSON.stringify({ watermarkText: '第一行\n第二行\n第三行\n第四行' }),
+    )
+    const invalidScope = effectScope()
+    const invalidWatermark = invalidScope.run(() => usePdfWatermark())
+
+    expect(invalidWatermark?.watermarkText.value).toBe('機密文件')
+    invalidScope.stop()
+  })
+
   it('重置浮水印設定並在下次開啟時維持預設值', async () => {
     const firstScope = effectScope()
     const watermark = firstScope.run(() => usePdfWatermark())
@@ -195,6 +228,75 @@ describe('usePdfWatermark', () => {
     expect(restoredWatermark?.rotation.value).toBe(-45)
 
     secondScope.stop()
+  })
+
+  it('允許三行文字並阻止超過三行的浮水印輸出', async () => {
+    const scope = effectScope()
+    const watermark = scope.run(() => usePdfWatermark())
+    const file = {
+      arrayBuffer: vi.fn(async () => new ArrayBuffer(8)),
+      name: '年度報告.pdf',
+      size: 8,
+      type: 'application/pdf',
+    } as unknown as File
+
+    await watermark?.selectFile(file)
+    watermark!.watermarkText.value = '機密文件\n僅供內部使用\n2026-07-15'
+
+    expect(watermark?.settingsIssue.value).toBe('')
+    expect(watermark?.canGenerate.value).toBe(true)
+
+    watermark!.watermarkText.value = '第一行\n第二行\n第三行\n第四行'
+
+    expect(watermark?.settingsIssue.value).toBe('文字浮水印最多 3 行。')
+    expect(watermark?.canGenerate.value).toBe(false)
+
+    scope.stop()
+  })
+
+  it('將三行文字逐行置中繪製成單一浮水印圖片', async () => {
+    let rasterSize: { height: number; width: number } | undefined
+    vi.spyOn(HTMLCanvasElement.prototype, 'toBlob').mockImplementation(function (
+      this: HTMLCanvasElement,
+      callback,
+    ) {
+      rasterSize = { height: this.height, width: this.width }
+      callback(new Blob(['png'], { type: 'image/png' }))
+    })
+    const scope = effectScope()
+    const watermark = scope.run(() => usePdfWatermark())
+    const file = {
+      arrayBuffer: vi.fn(async () => new ArrayBuffer(8)),
+      name: '年度報告.pdf',
+      size: 8,
+      type: 'application/pdf',
+    } as unknown as File
+
+    await watermark?.selectFile(file)
+    watermark!.watermarkText.value = '機密文件\n僅供內部使用\n2026-07-15'
+
+    const generation = watermark?.generate()
+    await vi.waitFor(() => expect(MockWorker.instances).toHaveLength(1))
+    const worker = MockWorker.instances[0]
+    await vi.waitFor(() => expect(worker.postMessage).toHaveBeenCalledOnce())
+    const request = worker.postMessage.mock.calls[0][0]
+
+    expect(rasterSize).toEqual({ height: 640, width: 480 })
+    expect(canvasContextMock.textAlign).toBe('center')
+    expect(canvasContextMock.textBaseline).toBe('middle')
+    expect(canvasContextMock.fillText.mock.calls).toEqual([
+      ['機密文件', 240, 128, 320],
+      ['僅供內部使用', 240, 320, 320],
+      ['2026-07-15', 240, 512, 320],
+    ])
+
+    worker.emit({
+      type: 'success',
+      jobId: request.jobId,
+      pdfBuffer: new Uint8Array([37, 80, 68, 70]).buffer,
+    })
+    await generation
+    scope.stop()
   })
 
   it('產生後提供仍為 PDF 的下載結果', async () => {
