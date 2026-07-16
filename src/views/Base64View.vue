@@ -4,17 +4,16 @@ import {
   CheckIcon,
   CircleHelpIcon,
   ClipboardIcon,
-  HistoryIcon,
   SaveIcon,
-  Trash2Icon,
 } from '@lucide/vue'
+import Base64HistoryDrawer from '@/components/base64/Base64HistoryDrawer.vue'
 import SegmentedControl from '@/components/forms/SegmentedControl.vue'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Textarea } from '@/components/ui/textarea'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { useBase64, type Base64HistoryRecord } from '@/composables/useBase64'
+import { useBase64 } from '@/composables/useBase64'
 
 const {
   alphabet,
@@ -38,23 +37,6 @@ const {
   sourceStats,
   swapInputOutput,
 } = useBase64()
-
-function formatRecordDate(value: string) {
-  return new Intl.DateTimeFormat('zh-TW', {
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(new Date(value))
-}
-
-function getOperationLabel(record: Base64HistoryRecord) {
-  return record.operation === 'encode' ? '編碼' : '解碼'
-}
-
-function getAlphabetLabel(record: Base64HistoryRecord) {
-  return record.alphabet === 'url-safe' ? 'URL-safe' : '標準'
-}
 </script>
 
 <template>
@@ -178,37 +160,11 @@ function getAlphabetLabel(record: Base64HistoryRecord) {
       </Card>
     </div>
 
-    <Card aria-label="轉換紀錄">
-      <CardHeader class="border-b px-4 pb-4 sm:px-5">
-        <div class="flex items-center gap-3">
-          <span class="flex size-8 items-center justify-center rounded-lg bg-accent text-accent-foreground"><HistoryIcon class="size-4" /></span>
-          <div><CardTitle>轉換紀錄</CardTitle><p class="mt-1 text-xs text-muted-foreground">{{ history.length }} 筆本機紀錄</p></div>
-        </div>
-        <CardAction>
-          <Button variant="ghost" size="sm" :disabled="history.length === 0" @click="clearHistory">
-            <Trash2Icon />全部刪除
-          </Button>
-        </CardAction>
-      </CardHeader>
-      <CardContent class="px-4 sm:px-5">
-        <div v-if="history.length === 0" class="py-8 text-center text-sm text-muted-foreground">尚無紀錄</div>
-        <div v-else class="divide-y">
-          <article v-for="record in history" :key="record.id" class="flex items-start gap-2 py-3">
-            <Button variant="ghost" class="h-auto min-w-0 flex-1 justify-start whitespace-normal px-2 py-2 text-left" @click="loadHistoryRecord(record)">
-              <span class="grid min-w-0 gap-2">
-                <span class="text-xs text-muted-foreground">{{ getOperationLabel(record) }} · {{ getAlphabetLabel(record) }} · {{ formatRecordDate(record.createdAt) }}</span>
-                <span class="grid min-w-0 gap-1 font-mono text-xs sm:grid-cols-2 sm:gap-4">
-                  <span class="truncate"><span class="mr-2 text-muted-foreground">輸入</span>{{ record.input }}</span>
-                  <span class="truncate"><span class="mr-2 text-muted-foreground">輸出</span>{{ record.output }}</span>
-                </span>
-              </span>
-            </Button>
-            <Button variant="ghost" size="icon" aria-label="刪除紀錄" title="刪除紀錄" @click="deleteHistoryRecord(record.id)">
-              <Trash2Icon />
-            </Button>
-          </article>
-        </div>
-      </CardContent>
-    </Card>
+    <Base64HistoryDrawer
+      :history="history"
+      @clear="clearHistory"
+      @delete="deleteHistoryRecord"
+      @load="loadHistoryRecord"
+    />
   </section>
 </template>
