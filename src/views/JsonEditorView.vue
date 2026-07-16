@@ -251,27 +251,30 @@ function handleFileChange(event: Event) {
       </Card>
     </div>
 
-    <Transition
-      enter-active-class="transition duration-200 ease-out"
-      enter-from-class="translate-y-2 opacity-0"
-      leave-active-class="transition duration-150 ease-in"
-      leave-to-class="translate-y-2 opacity-0"
-    >
-      <Alert
-        v-if="lastAction"
-        :variant="lastActionVariant"
-        class="fixed right-4 bottom-4 z-50 w-[min(calc(100vw-2rem),24rem)] shadow-lg sm:right-6 sm:bottom-6"
+    <Teleport to="body">
+      <Transition
+        enter-active-class="transition duration-200 ease-out"
+        enter-from-class="-translate-y-2 opacity-0"
+        leave-active-class="transition duration-150 ease-in"
+        leave-to-class="-translate-y-2 opacity-0"
       >
-        <CircleAlertIcon v-if="lastActionVariant === 'destructive'" />
-        <CheckIcon v-else />
-        <AlertTitle>{{ lastActionVariant === 'destructive' ? '操作失敗' : '操作完成' }}</AlertTitle>
-        <AlertDescription>{{ lastAction }}</AlertDescription>
-        <AlertAction>
-          <Button variant="ghost" size="icon-sm" aria-label="關閉通知" @click="dismissLastAction">
-            <XIcon />
-          </Button>
-        </AlertAction>
-      </Alert>
-    </Transition>
+        <div
+          v-if="lastAction"
+          class="pointer-events-none fixed top-4 right-4 z-50 w-[min(calc(100vw-2rem),24rem)] sm:top-6 sm:right-6"
+        >
+          <Alert :variant="lastActionVariant" class="pointer-events-auto shadow-lg">
+            <CircleAlertIcon v-if="lastActionVariant === 'destructive'" />
+            <CheckIcon v-else />
+            <AlertTitle>{{ lastActionVariant === 'destructive' ? '操作失敗' : '操作完成' }}</AlertTitle>
+            <AlertDescription>{{ lastAction }}</AlertDescription>
+            <AlertAction>
+              <Button variant="ghost" size="icon-sm" aria-label="關閉通知" @click="dismissLastAction">
+                <XIcon />
+              </Button>
+            </AlertAction>
+          </Alert>
+        </div>
+      </Transition>
+    </Teleport>
   </section>
 </template>
